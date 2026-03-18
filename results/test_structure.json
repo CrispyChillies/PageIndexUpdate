@@ -1,0 +1,93 @@
+{
+  "doc_name": "test.pdf",
+  "structure": [
+    {
+      "title": "Introduction",
+      "start_index": 1,
+      "end_index": 3,
+      "node_id": "0000",
+      "summary": "This partial document describes a study focused on enhancing content-based image retrieval (CBIR) in medical imaging, particularly in chest radiography. It addresses two primary challenges: preserving fine-grained pathological textures and providing clinically meaningful explanations. The authors propose a clinically inspired multi-view retrieval framework that uses a modernized CNN backbone (ConvNeXtV2) with a dual-branch architecture. This includes a Canonical Branch for capturing global anatomical context and an Attentive Refinement Branch with Spatial Residual Attention (SRA) for emphasizing diagnostically relevant regions. Additionally, the framework introduces Concept-to-Region Alignment for Retrieval (CRAR) to ensure that retrieval decisions are aligned with clinically meaningful concepts. The effectiveness of this approach is demonstrated through experiments on three medical datasets (COVIDx, ISIC 2017, and TBX11K), showing improved retrieval performance and interpretability compared to existing methods."
+    },
+    {
+      "title": "Methodology",
+      "start_index": 3,
+      "end_index": 4,
+      "nodes": [
+        {
+          "title": "Backbone Selection",
+          "start_index": 4,
+          "end_index": 5,
+          "node_id": "0002",
+          "summary": "The partial document discusses advancements in medical image retrieval systems, focusing on the integration of spatial residual connections and ensemble mechanisms to enhance retrieval precision for complex medical imagery. It introduces the Concept-to-Region Alignment for Retrieval (CRAR) methodology, which aims to improve the interpretability and alignment of model outputs with clinical observations. The document details the evaluation of various backbone architectures, including CNNs and Vision Transformers (ViTs), for their effectiveness in medical image retrieval tasks. Empirical results indicate that CNN-based models, particularly ConvNeXtV2, outperform ViT-based models due to their superior handling of fine-grained visual details critical in medical imaging. Additionally, it outlines a Multi-View Ensemble framework that integrates a Canonical Branch and an Attentive Refinement Branch with Spatial Residual Attention (SRA) to mimic the collaborative diagnostic process of radiologists, thereby improving the model's ability to capture both broad and subtle diagnostic cues."
+        },
+        {
+          "title": "Ensemble-Based Multi-View Integration",
+          "start_index": 5,
+          "end_index": 7,
+          "node_id": "0003",
+          "summary": "This partial document describes a method for improving medical image retrieval through a clinical-inspired multi-view approach. It highlights the use of ConvNeXtV2 as the backbone for its ability to extract multi-scale features, crucial for identifying subtle lesions. The document introduces an ensemble-based multi-view integration strategy that combines a canonical branch for global feature extraction with an attentive refinement branch that uses Spatial Residual Attention (SRA) to emphasize important spatial regions. SRA is detailed as a lightweight attention mechanism designed to enhance the detection of critical areas within medical images, unlike traditional Global Average Pooling (GAP) which treats all spatial locations equally. The document also outlines a weighted concatenation ensemble strategy to combine the outputs of the canonical and attentive refinement branches, with weights determined through test-time augmentation to optimize retrieval performance. Additionally, it mentions the use of the FAISS library for scalable indexing and introduces Concept-to-Region Alignment for Retrieval (CRAR) as a solution to align concepts with relevant regions in the images, enhancing the interpretability and accuracy of the retrieval system."
+        },
+        {
+          "title": "Large-Scale Indexing with FAISS",
+          "start_index": 7,
+          "end_index": 7,
+          "node_id": "0004",
+          "summary": "This partial document describes a method for medical image retrieval using a multi-view approach that combines global and localized features. It introduces an algorithm for creating ensemble embeddings through weighted concatenation of features extracted from two branches: a Canonical branch for global context and an SRA branch for localized saliency. The weights for this concatenation are determined empirically using Test-Time Augmentation (TTA) to maximize retrieval performance. Additionally, it outlines the use of the FAISS library for large-scale indexing to ensure scalability in clinical settings, and proposes a new module called Concept-to-Region Alignment for Retrieval (CRAR) to address clinical misalignment issues in post-hoc methods."
+        },
+        {
+          "title": "Concept-to-Region Alignment for Retrieval (CRAR)",
+          "start_index": 7,
+          "end_index": 9,
+          "node_id": "0005",
+          "summary": "This partial document describes a method for multi-view medical image retrieval that combines global and localized features through a weighted concatenation approach. It details the extraction of ensemble embeddings using canonical and attentive refinement features, followed by \u21132-normalization and weighted concatenation to create a unified high-dimensional representation. The document explains how test-time augmentation is used to empirically determine optimal weights for this combination, ensuring the best retrieval performance. Additionally, it outlines the use of the FAISS library for efficient large-scale indexing and introduces the Concept-to-Region Alignment for Retrieval (CRAR) module, which enhances retrieval accuracy by aligning medical concepts with relevant image regions. The CRAR module uses a fine-tuned ConceptCLIP model to achieve fine-grained visual-textual encoding and employs a hybrid ranking score that balances visual similarity with semantic concept overlap. The document also mentions experiments conducted across multiple medical datasets to evaluate the retrieval framework's effectiveness."
+        }
+      ],
+      "node_id": "0001",
+      "summary": "The partial document describes a novel approach to medical image retrieval called Clinical-Inspired Multi-View Medical Image Retrieval, which utilizes a dual-branch ConvNeXtV2 architecture to capture both global anatomical context and localized pathological patterns. Key components include a Canonical Branch for holistic anatomical modeling, an Attentive Refinement Branch with Spatial Residual Attention (SRA) for emphasizing diagnostically relevant areas, and a Concept-to-Region Alignment for Retrieval (CRAR) module to enhance interpretability by aligning retrieval evidence with clinically meaningful concepts and regions. The study demonstrates superior retrieval performance and interpretability across three medical datasets (COVIDx, ISIC 2017, and TBX11K). Additionally, it highlights the texture-saliency paradox, showing that CNN architectures, particularly ConvNeXtV2, outperform transformer-based models in preserving fine-grained pathological cues essential for medical image analysis."
+    },
+    {
+      "title": "Experiment",
+      "start_index": 9,
+      "end_index": 9,
+      "nodes": [
+        {
+          "title": "Retrieval Evaluation",
+          "start_index": 9,
+          "end_index": 11,
+          "node_id": "0007",
+          "summary": "This partial document describes a clinical-inspired multi-view medical image retrieval system designed to enhance the precision and clinical relevance of medical image searches. It introduces a weighting mechanism that balances visual similarity and semantic concept agreement, emphasizing clinically significant findings over superficial anatomical similarities. The system employs multimodal explainable AI (XAI) and spatial grounding techniques to provide interpretable results, highlighting specific clinical concepts within images. The document details experiments conducted across three datasets\u2014COVIDx CXR, ISIC 2017, and TBX11K\u2014to evaluate the system's performance in different medical domains, showcasing superior retrieval accuracy compared to existing methods. Additionally, it includes case studies that demonstrate the system's ability to precisely localize specific medical concepts, ensuring that the retrieval process is driven by meaningful clinical evidence."
+        },
+        {
+          "title": "Explainable AI Cases Studies",
+          "start_index": 11,
+          "end_index": 12,
+          "node_id": "0008",
+          "summary": "The partial document discusses a clinical-inspired multi-view medical image retrieval system that achieves state-of-the-art performance on the TBX11K dataset for tuberculosis case retrieval. It compares various backbones including X-MIR, RwA, BioMedCLIP, DINOv2, CheXFound, and the proposed method, demonstrating superior retrieval precision and ranking quality across different medical modalities and pathologies. The document also presents two case studies using the CRAR framework: one on focal pathological grounding, which shows precise localization of specific medical concepts like lung cysts or clavicle fractures; and another on resolving false positives, highlighting the system's capability to flag mismatches in clinical concepts between query and retrieved images. Additionally, it addresses the texture-saliency paradox, noting that despite pretraining on large medical datasets, ViT-based models may not produce optimal embeddings for medical image retrieval tasks."
+        },
+        {
+          "title": "Texture-Saliency Paradox Explain",
+          "start_index": 12,
+          "end_index": 14,
+          "node_id": "0009",
+          "summary": "The partial document discusses two case studies related to medical image retrieval systems, focusing on the capabilities of a system called CRAR. Case Study I examines CRAR's precision in identifying and localizing specific pathological features in medical images, such as lung cysts, demonstrating its superiority over global retrieval models that might rely on general anatomical features. Case Study II highlights CRAR\u2019s ability to resolve false positives by ensuring that retrieved images have aligned pathological concepts with the query, thus providing more reliable diagnostic support.\n\nAdditionally, the document explores the texture-saliency paradox, a discrepancy observed between the retrieval performance of Vision Transformer (ViT)-based models and their ability to highlight spatial evidence relevant to medical diagnoses. It explains that while ViT models excel at capturing high-level semantic concepts, they may fail to preserve continuous spatial structures crucial for identifying subtle pathological textures in medical images. In contrast, convolutional neural networks (CNNs) are better at preserving spatial locality and capturing texture patterns, making them more effective for medical image retrieval tasks.\n\nThe document also presents an analysis comparing saliency maps generated by CLIP-based and CNN-based models, showing that CNNs highlight broader and more continuous lung structures, contributing more reliably to similarity computations. Quantitative evaluations across various datasets confirm the superior performance of CNN backbones in medical image retrieval tasks.\n\nFinally, the discussion section outlines the proposed Multi-View Ensemble with Spatial Residual Attention framework, emphasizing the integration of global semantic structures and localized lesion patterns to enhance retrieval robustness. The introduction of the CRAR mechanism is highlighted for improving interpretability by aligning visually significant regions in query images with similar patterns in retrieved cases. The conclusion underscores the effectiveness of combining complementary feature representations to enhance the robustness of medical image retrieval systems."
+        }
+      ],
+      "node_id": "0006",
+      "summary": "This partial document discusses a method for multi-view medical image retrieval that balances visual similarity with semantic concept agreement through a weighting coefficient \u03b3. It emphasizes the importance of assigning higher weights to critical clinical findings over general anatomical features to ensure that the retrieval process is driven by clinically meaningful evidence rather than superficial similarities. The document also introduces a multimodal explainable AI (XAI) approach called CRAR, which provides interpretability by localizing shared clinical concepts across query and retrieved images using heatmaps. Additionally, it outlines an experimental setup that evaluates the retrieval framework across three different medical datasets related to COVID-19, skin lesions, and tuberculosis."
+    },
+    {
+      "title": "Discussion",
+      "start_index": 14,
+      "end_index": 14,
+      "node_id": "0010",
+      "summary": "The partial document discusses the performance of various backbone architectures in medical image retrieval, highlighting the effectiveness of ConvNeXtV2 among others. It introduces a Multi-View Ensemble with Spatial Residual Attention framework designed to integrate global semantic structures and localized lesion patterns for improved retrieval robustness. Additionally, it presents a Concept-to-Region Alignment for Retrieval (CRAR) mechanism aimed at enhancing interpretability by aligning important visual regions with similar pathological patterns. The document concludes by emphasizing the competitiveness of conventional convolutional neural networks, especially when fine-tuned on specific medical datasets, suggesting their strong capability in capturing fine-grained texture patterns essential for medical image retrieval."
+    },
+    {
+      "title": "Conclusion",
+      "start_index": 14,
+      "end_index": 16,
+      "node_id": "0011",
+      "summary": "The partial document discusses a study on medical image retrieval systems, focusing on the effectiveness of different backbone architectures such as DenseNet121, MedSigLIP, ResNet50, ConvNeXtV2, and MedCLIP. It introduces a Multi-View Ensemble with Spatial Residual Attention framework designed to combine global semantic structures and localized lesion patterns for improved retrieval robustness. Additionally, it presents a Concept-to-Region Alignment for Retrieval (CRAR) mechanism aimed at enhancing interpretability by aligning important regions in query images with similar patterns in retrieved cases. The document highlights that conventional CNN architectures, especially ConvNeXtV2, perform well in medical image retrieval tasks, suggesting that these models effectively capture fine-grained texture patterns crucial for medical diagnosis. The conclusion emphasizes the potential of combining complementary feature representations and the need for further research into reliable explanation techniques for medical image retrieval systems."
+    }
+  ]
+}

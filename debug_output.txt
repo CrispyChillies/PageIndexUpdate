@@ -1,0 +1,1481 @@
+Parsing PDF...
+start find_toc_pages
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Retrieval with Spatial
+Residual Attention and Concept-Driven Explainability
+in Medical Images
+Van Tu Nguyen1,2, Long Pham Nguyen Hai1,2, and Viet V o Hoai1,2,3
+1Faculty of Information Technology, University of Science, Ho Chi Minh City, Vietnam
+2Vietnam National University, Ho Chi Minh City, Vietnam
+{22127434,22127248}@student.hcmus.edu.vn
+vhviet@fit.hcmus.edu.vn
+Abstract.Reliable content-based image retrieval (CBIR) in chest radiography
+requires both accurate semantic understanding and preservation of fine-grained
+pathological textures. While Vision Transformers (ViTs) dominate many vision
+tasks, we identify aTexture–Saliency Paradoxin medical retrieval, where global
+attention mechanisms often overlook subtle high-frequency patterns critical for
+detecting early-stage lesions. To address this limitation, we propose a clinically
+inspired multi-view retrieval framework built on a modernized CNN backbone
+(ConvNeXtV2). The model employs a dual-branch architecture with aCanoni-
+cal Branchfor global anatomical context and anAttentive Refinement Branch
+withSpatial Residual Attention (SRA)to capture localized pathological cues.
+To enhance interpretability, we introduceConcept-to-Region Alignment for
+Retrieval (CRAR), which grounds retrieval decisions in clinically meaningful
+concepts. Experiments on three datasets (COVIDx, ISIC 2017, and TBX11K)
+show that our framework consistently outperforms recent medical transformers,
+including DinoV2, BioMedCLIP, MedSigLIP, and MedCLIP. Quantitative evalu-
+ation using Insertion and Deletion metrics further demonstrates that our concept-
+driven explanations better align with clinical reasoning, enabling reliable and
+interpretable medical image retrieval. Source code can be found here:Github-
+CIMVR2026
+Keywords:Medical Image Retrieval · Chest Radiography · Explainable AI ·
+Spatial Residual Attention · Concept-to-Region Alignment · ConvNeXtV2.
+1 Introduction
+Medical imaging plays a critical role in modern clinical diagnosis. With the rapid
+growth of digital medical archives, content-based image retrieval (CBIR) has emerged
+as a promising decision-support tool that allows clinicians to retrieve previously diag-
+nosed cases with visual patterns similar to a query image. By comparing a current exam-
+ination with historical cases, CBIR systems can provide empirical evidence that helps
+reduce diagnostic uncertainty and supports clinical decision-making. For real clinical
+3Corresponding author. Email: vhviet@fit.hcmus.edu.vn
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain a section that lists the main topics or chapters with corresponding page numbers, which is typical of a table of contents. It starts directly with the title, authors, affiliations, and abstract, followed by keywords and an introduction, without any intermediate table of contents.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 2 Tu N. V . et al.
+deployment, however, retrieval systems must satisfy two essential requirements: they
+must preserve subtle pathological cues and provide interpretable explanations consis-
+tent with clinical reasoning. As illustrated in Fig. 1, a clinically reliable retrieval frame-
+work should not only return visually similar cases but also provide spatially grounded
+explanations that allow clinicians to verify the underlying pathological evidence.
+Fig. 1. Overview of the retrieval-enhanced diagnostic workflow. The system identifies patho-
+logically similar cases and provides saliency maps for spatial grounding, enabling clinicians to
+verify diagnostic evidence and establish trust.
+Despite recent progress in deep learning for medical imaging, two challenges re-
+main unresolved in medical image retrieval. The first challenge is the preservation
+of fine-grained pathological textures. Early CBIR systems relied on handcrafted de-
+scriptors such as texture and shape statistics [9]. Deep convolutional neural networks
+later became the dominant paradigm for extracting visual embeddings, enabling sim-
+ilarity comparison through distance metrics such as cosine similarity. More recently,
+vision–language foundation models have been explored for medical retrieval. For ex-
+ample, Denner et al. [3] demonstrated that CLIP-based medical models can achieve
+competitive performance on radiology datasets without extensive task-specific training.
+However, these models are primarily optimized for cross-modal semantic alignment
+rather than instance-level visual similarity, which may limit their ability to capture sub-
+tle pathological patterns.
+The second challenge is the lack of reliable interpretability in retrieval systems.
+Several studies incorporate explainable AI techniques to visualize model decisions. For
+instance, X-MIR [7] applies Grad-CAM and attention maps to highlight regions con-
+tributing to retrieval results, while other approaches rely on saliency-based explanations
+[5]. However, recent studies suggest that saliency maps may not always align with clin-
+ical reasoning and can highlight regions unrelated to pathology [1,?]. As an alternative,
+concept-based interpretability has gained increasing attention. Zhang et al. [20] intro-
+duced MDNet to represent symptom-level semantics, while Patrício et al. [14] proposed
+a concept-driven vision–language framework for medical explanations.
+These limitations raise an important question:how can we design a retrieval system
+that preserves fine-grained pathological evidence while providing clinically meaningful
+explanations?
+To address this problem, we propose a clinically inspired retrieval framework that
+integrates spatially grounded feature learning with concept-driven explanations. Our
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section titles, chapter names, or indications of a structured outline that would be typical of a table of contents. It appears to be a continuous piece of text discussing challenges and solutions in medical image retrieval systems.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 3
+approach employs a modern convolutional architecture,ConvNeXtV2, within a dual-
+branch design to capture both global anatomical context and localized pathological pat-
+terns. The framework consists of aCanonical Branchthat models holistic anatomi-
+cal structure and anAttentive Refinement BranchwithSpatial Residual Attention
+(SRA)to emphasize diagnostically relevant regions. To further enhance interpretabil-
+ity, we introduceConcept-to-Region Alignment for Retrieval (CRAR), which aligns
+retrieval evidence with clinically meaningful concepts and spatial regions.
+Experiments on three medical datasets (COVIDx, ISIC 2017, and TBX11K) demon-
+strate that our framework achieves strong retrieval performance while providing clini-
+cally interpretable explanations. The main contributions of this work are summarized
+as follows:
+1. Multi-View Retrieval Architecture.We propose a dual-branch retrieval frame-
+work with Spatial Residual Attention (SRA) that preserves both global anatomical
+context and localized pathological textures.
+2. Concept-to-Region Alignment for Retrieval (CRAR).We introduce a concept-
+driven explanation module that grounds retrieval results in clinically meaningful
+visual evidence.
+3. Texture–Saliency Paradox Analysis.We provide empirical evidence that modern
+CNN architectures with spatial inductive biases can better preserve fine-grained
+pathological cues than transformer-based models in medical image retrieval.
+2 Methodology
+Fig. 2. Overview of the proposed multi-view ensemble framework. A dual-branch Con-
+vNeXtV2 architecture fuses canonical and attentive features for retrieval, while the Concept-
+to-Region xAI module provides spatial localization of clinical findings (e.g., consolidation) to
+ensure diagnostic interpretability.
+Our research initiates with an evaluation across diverse datasets to identify the most
+robust backbone architectureforradiographic features. Building upon the optimal
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain a structured list of headings or sections that typically characterize a table of contents. It starts directly with content related to a specific topic without any preliminary section listing the document's structure.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 4 Tu N. V . et al.
+selection, we integrate a spatial residual connection and implement a strategic ensemble
+mechanism, significantly enhancing retrieval precision for complex medical imagery.
+To further bridge the gap between algorithmic performance and clinical transparency,
+we introduce theConcept-to-Region Alignment for Retrieval (CRAR)methodology.
+This approach facilitates a lesion-centric perspective, providing granular localization
+of pathological findings and offering a detailed interpretability layer that aligns the
+model’s internal representations with expert clinical observation.
+2.1 Backbone Selection
+During the backbone selection stage, we evaluated both CNN-based retrieval encoders
+(DenseNet121 [8], ResNet50 [6], ConvNeXtV2) and Vision Transformer (ViT) archi-
+tectures (MedSigLIP [18] and MedCLIP [16]) to analyze their compatibility with med-
+ical image retrieval. Our initial hypothesis was that medical ViT-based models would
+perform better due to their pretraining on paired medical image–text datasets.
+However, the empirical results in Table 1 show that CNN-based architectures con-
+sistently outperform ViT-based models across all datasets, with ConvNeXtV2 achieving
+the best performance in terms of Recall@1 and mAP. This observation reveals an in-
+teresting paradox: despite being pretrained on large-scale medical image–text corpora,
+ViT-based models such as MedSigLIP and MedCLIP perform worse on pure visual
+retrieval tasks. One explanation is that these Transformer-based models are primarily
+optimized for cross-modal semantic alignment rather than instance-level visual similar-
+ity. Their representations tend to capture high-level semantic concepts but may over-
+look subtle structural patterns and fine-grained textures that are crucial in radiological
+images. Medical retrieval tasks often depend on small pathological cues such as faint
+opacities or local tissue irregularities, which require strong spatial sensitivity.
+Table 1.Unified retrieval results across three datasets. For each dataset, we report Recall@K and
+mean Average Precision (mAP). The best results for each dataset are highlighted in bold.
+BackboneCOVIDx ISIC 2017 TBX11K
+R@1 R@5 mAP R@1 R@5 mAP R@1 R@5 mAP
+DenseNet121 88.67 96.33 85.92 64.44 85.19 53.71 97.83 98.70 97.75
+ResNet50 89.33 97.00 88.01 62.9693.7056.42 98.41 99.49 97.98
+ConvNeXtV293.67 97.33 92.32 67.7892.2260.70 98.70 99.49 98.99
+MedSigLIP 87.33 96.33 64.74 61.48 91.11 46.81 93.56 97.90 85.17
+MedCLIP 82.15 91.40 58.20 55.30 86.45 40.12 89.20 94.15 79.45
+Among the evaluated architectures, ConvNeXtV2 provides the most suitable design
+for this task. Its large-kernel depthwise convolutions expand the receptive field while
+preserving local spatial continuity, enabling the model to capture both global anatom-
+ical context and fine-grained pathological textures. In addition, its hierarchical convo-
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section that lists the contents of the document with corresponding page numbers or section markers, which is typical of a table of contents. It starts directly with content related to a specific topic without providing an overview of what sections follow.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 5
+lutional structure naturally supports multi-scale feature extraction, which is beneficial
+for distinguishing subtle lesion patterns in medical images. Based on these empirical
+results and architectural advantages, we select ConvNeXtV2 as the backbone of our
+retrieval framework.
+2.2 Ensemble-Based Multi-View Integration
+In clinical radiography, diagnostic consensus is seldom reached through a single per-
+spective. Radiologists often analyze medical images from multiple "views," where one
+specialist might focus on subtle structural anomalies (Lesion A) while another identifies
+broader pathological patterns (Lesion B). To replicate this collaborative expertise, we
+propose a Multi-View Ensemble framework utilizing a dual-branch architecture
+Our framework utilizes a dual-branch ensemble: a Canonical Branch that extracts
+raw features to maintain global data integrity, and an Attentive Refinement Branch inte-
+grating Spatial Residual Attention (SRA) to highlight subtle spatial nuances. By fusing
+these complementary views, the model captures both fundamental representations and
+refined diagnostic cues, ensuring a more robust and holistic interpretation of radio-
+graphic data.
+Spatial Residual AttentionIn standard convolutional feature extraction for image
+retrieval, the final spatial feature mapX∈RC×H×Wis typically aggregated into a
+global descriptor via Global Average Pooling (GAP):
+fgap=1
+H·WHX
+i=1WX
+j=1X:,i,j∈RC(1)
+However, GAP assigns equal weight to every spatial location, which dilutes the con-
+tribution of small but diagnostically important regions, such as lesions or nodules that
+may occupy only a fraction of the image.
+To address this limitation, we proposeSpatial Residual Attention (SRA), a lightweight
+attention module that learns to emphasize discriminative spatial regions through mul-
+tiple attention heads with simple flow as can be seen in figure 3. Inspired byClass-
+Specific Residual Attention (CSRA)[22], our formulation replaces the class-specific
+design with a class-agnostic multi-head mechanism better suited for metric learning-
+based retrieval.
+Given the backbone feature mapX∈RC×H×W, SRA computesKspatial atten-
+tion maps using a1×1convolutionW att∈RK×C:
+Ak=softmax
+W(k)
+att∗X
+∈RH×W, k= 1, . . . , K(2)
+where each headkproduces a normalized attention map over the spatial dimensions.
+The attention-weighted feature for each head is then obtained by:
+fk=HX
+i=1WX
+j=1Ak,i,j·X:,i,j∈RC(3)
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text starts with what appears to be a section title and page number 'Clinical-Inspired Multi-View Medical Image Retrieval 5', which could suggest the beginning of a table of contents. However, the subsequent text continues as a continuous paragraph without any further section titles or page numbers, indicating it is likely part of the main content rather than a structured table of contents.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 6 Tu N. V . et al.
+Fig. 3. Detail of the Spatial Residual Attention (SRA) mechanism. The module employs par-
+allel GAP and multi-head attention branches, followed by residual integration and L2 normaliza-
+tion, to generate saliency-aware embeddings for robust medical image retrieval.
+TheKhead features are averaged to form the aggregated attention feature:
+fatt=1
+KKX
+k=1fk (4)
+Finally, SRA fuses the GAP feature with the attention-weighted feature via a residual
+connection controlled by a scalar hyperparameterλ:
+fSRA=f gap+λ·f att (5)
+The outputf SRA∈RCpreserves the original backbone dimensionality and is subse-
+quentlyℓ 2-normalized to produce the final retrieval embedding.
+The SRA module introduces onlyK×Clearnable parameters from the1×1
+convolution, making it highly lightweight. In our experiments, we setK= 8attention
+heads andλ= 0.1, which provides a conservative residual contribution that refines the
+embedding without destabilizing training. Unlike CSRA, which ties each attention head
+to a specific class and produces classification logits, SRA operates in a class-agnostic
+manner, allowing the heads to freely discover diverse spatial patterns such as texture,
+boundary, or region-of-interest cues that are beneficial for similarity-based retrieval.
+Ensemble StrategyTo leverage the complementary strengths of the baseline Con-
+vNeXtV2 (with GAP) and the proposed ConvNeXtV2-SRA, we adopt a weighted con-
+catenation ensemble for the final retrieval embedding. Given an input imageI, each
+model produces anℓ 2-normalized embedding:
+eGAP=f ConvNeXtV2 (I)∈RC,e SRA=f ConvNeXtV2-SRA (I)∈RC(6)
+The ensemble embedding is formed by weighted concatenation:
+eens= [α·e GAP∥β·e SRA]∈R2C(7)
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section titles, chapter names, or a list of contents typically found at the beginning of a document indicating where different sections can be found. It appears to be a segment of a technical paper discussing a specific mechanism and its implementation details.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 7
+where∥denotes concatenation and (α,β) are scalar weights satisfyingα+β= 1.
+The fused embedding is thenℓ 2-normalized before computing pairwise distances for
+retrieval.
+The weighted concatenation approach ensures that the global context from the Canon-
+ical branch and the localized saliency from the SRA branch are preserved in a unified
+high-dimensional manifold. This process is formalized in Algorithm 1.
+Algorithm 1Multi-View Ensemble Embedding Extraction
+Require:Input imageI, weightsα, β, backbonesf GAP, fSRA
+Ensure:Final ensemble embeddinge ens
+1:f GAP←f GAP(I){Extract Canonical features}
+2:f SRA←f SRA(I){Extract Attentive Refinement features}
+3:e GAP←fGAP
+∥fGAP∥2,e SRA←fSRA
+∥fSRA∥2{ℓ2-normalization}
+4:e concat←[α·e GAP∥β·e SRA]{Weighted concatenation}
+5:e ens←econcat
+∥econcat∥2{Final normalization for cosine similarity}
+6:returne ens
+Weight Selection via Test-Time Augmentation.Rather than manually tuningαandβ,
+we determine them empirically using Test-Time Augmentation (TTA). For each candi-
+date weight pair(α, β)∈ {(0.1,0.9),(0.2,0.8), . . . ,(0.9,0.1)}, we evaluate retrieval
+performance on the validation set under TTA where each query image is augmented
+with horizontal flips and multi-scale crops, and the resulting embeddings are averaged
+before fusion. The weight pair that maximizes the mean Average Precision (mAP) un-
+der TTA is selected as the final ensemble configuration. This procedure ensures that
+the weight allocation reflects each model’s actual contribution to retrieval quality un-
+der realistic inference conditions, without requiring additional learnable parameters or
+a held-out tuning set.
+2.3 Large-Scale Indexing with FAISS
+To ensure the scalability of our framework in real-world clinical environments, we uti-
+lize the FAISS (Facebook AI Similarity Search) library [4] for efficient vector index-
+ing. Given the high dimensionality of our ensemble embeddings (2C), we implement
+an optimized index structure that supports fast nearest-neighbor search. Specifically,
+the gallery embeddings are stored in a flat index (IndexFlatIP) to maintain maxi-
+mum retrieval precision via Inner Product (which is equivalent to cosine similarity for
+ℓ2-normalized vectors). This indexing pipeline allows the system to query thousands of
+historical radiographs in milliseconds, meeting the performance requirements of time-
+sensitive clinical decision support.
+2.4 Concept-to-Region Alignment for Retrieval (CRAR)
+To overcome the clinical misalignment of post-hoc methods like Grad-CAM, we pro-
+poseConcept-to-Region Alignment for Retrieval (CRAR). This module serves as
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain a structured list of headings or sections that typically characterize a table of contents. It appears to be a segment from a technical paper, starting directly into content without an introductory table of contents.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 8 Tu N. V . et al.
+a diagnostic bridge, ensuring that retrieval results are anchored in identifiable patho-
+logical regions. We instantiate CRAR usingConceptCLIP[12] as the foundation, fine-
+tuned on the VinDR-CXR dataset [11] (PhysioNet), which encompasses a diverse range
+of clinical concepts and thoracic abnormalities. This adaptation phase allows the model
+to internalize the broad variability of pathological signatures found in real-world clini-
+cal chest radiographs
+Fine-Grained Visual-Textual Encoding.For an imageI m, the backbonef θextracts
+spatial embeddingsi m∈Rd×rforrpatches. Simultaneously, medical conceptsg m,j
+are derived by mean-pooling token embeddings from the clinical reports at their corre-
+sponding indicesV j:
+gm,j=1
+|Vj|X
+v∈V jtm,v (8)
+Alignment and Refinement.The concept-to-patch similarity matrixA∈Rw×ryields
+alignment scoresa jivia cosine similarity. These are refined to produce a robust rele-
+vance scores jfor each conceptj:
+¯aji= log (1 + exp [z m,n·(−t gaji+bg)])−1, s j= max
+i(¯aji)(9)
+wheret gandb gare learnable parameters. For inference, we retain a set of active con-
+ceptsC={j|s j> τ}.
+Hybrid Ranking Score and Concept Weighting.To compute the final ranking of a
+candidate imageI nrelative to a queryI q, we employ a hybrid scoring mechanism
+that integrates global visual similarity with clinically grounded semantic concepts. This
+formulation ensures that retrieved cases are not only visually similar but also patholog-
+ically consistent.
+Algorithm 2Hybrid Concept-Visual Ranking
+Require:QueryI q, CandidateI n, balancing factorγ, concept weightsΩ={ω j}
+Ensure:Total similarity scoreS total
+1:Visual Similarity:
+2:S vis←1+cos(e q,en)
+2{Normalized cosine similarity}
+3:Semantic Concept Overlap:
+4: Identify shared conceptsJ ← C q∩ Cn
+5:S concept←0,Z←0
+6:for allconceptj∈ Jdo
+7:c align←min(s(q)
+j, s(n)
+j){Concept confidence alignment}
+8:S concept←S concept +ωj·calign
+9:Z←Z+ω j
+10:end for
+11:ifZ >0then
+12:S concept←S concept/Z{Weight normalization}
+13:end if
+14:Hybrid Fusion:
+15:S total←(1−γ)·S vis+γ·S concept
+16:returnS total
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section titles, chapter names, or indications of a structured outline that would typically be summarized in a table of contents. It appears to be a continuous piece of technical writing without breaks or headings that would suggest the presence of a table of contents.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 9
+The weighting coefficientγ∈[0,1]controls the balance between visual similarity
+and semantic concept agreement and is determined empirically on the validation set.
+The concept weightω jreflects the clinical importance of specific findings. For example,
+critical abnormalities (e.g., pneumothorax) are assigned higher weights than generic
+anatomical descriptors (e.g., normal lung). This design penalizes retrievals driven by
+superficial anatomical similarity and instead prioritizes matches supported by clinically
+meaningful evidence.
+Multimodal XAI and Spatial Grounding.CRAR provides inherent interpretability
+by back-projecting the alignment scores¯a jionto the image manifold. This explicitly
+localizes each conceptj(as shown in Fig. 4), enabling clinicians to verify that the
+retrieved samples share not only a global visual likeness but also a common pathological
+site.
+Fig. 4. Qualitative results of CRAR.Heatmaps derived from alignment scores¯a jilocalize
+shared clinical concepts across query and retrieved images. This validates that the retrieval pro-
+cess is driven by pathological evidence rather than anatomical shortcuts.
+3 Experiment
+3.1 Retrieval Evaluation
+We validate our framework across three datasets covering distinct medical domains:
+COVIDx CXRfor COVID-19 detection,ISIC 2017for skin lesion analysis, andTBX11K
+for tuberculosis screening. Dataset statistics and evaluation setups are summarized in
+Table 2. Following standard protocols, we adopt an 80/20 split for the radiographic
+datasets to construct the retrieval galleries.
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain a structured list of chapter or section titles with corresponding page numbers, which is typical of a table of contents. Instead, it appears to be a segment from a research paper, including parts of the methodology and experimental sections.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 10 Tu N. V . et al.
+Table 2.Summary of evaluation datasets.
+Dataset Modality Pathology Total Samples
+COVIDx CXR [15] Chest X-ray COVID-19 vs. Normal∼14,000
+ISIC 2017 [2] Dermoscopy Skin Lesions∼2,000 (Eval)
+TBX11K [10] Chest X-ray Tuberculosis∼11,000
+Evaluation Metrics.Given a queryq, the system extracts feature embeddings via the
+backbone and retrieves the top-Ksimilar samples from the gallery using cosine similar-
+ity. To quantify performance, we employ standard metrics:Precision@KandRecall@K
+to measure relevance and retrieval coverage, and mean Average Precision (mAP) to as-
+sess overall ranking quality.
+Table 3.Performance comparison on the COVIDx CXR dataset. Our method achieves the highest
+retrieval accuracy in COVID-19 screening.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10 (%)
+X-MIR (ConvNextv2) [7] 93.67 93.40 92.97 93.67 97.33 98.33 92.32
+RwA (ResNet-Attn) [21] 81.00 79.33 78.47 81.00 94.00 96.00 72.80
+BioMedCLIP [19] 90.33 88.10 86.72 90.33 96.90 97.50 86.45
+DINOv2 (Chest-tuned) [13] 83.40 88.40 86.75 91.20 97.85 98.90 83.40
+CheXFound [17] 91.80 90.20 88.90 91.80 97.60 98.70 90.10
+Ours (Proposed) 95.12 94.85 94.30 95.12 98.45 99.10 94.25
+Table 4.Evaluation results on the ISIC 2017 dataset for skin lesion retrieval, demonstrating robust
+performance on non-radiographic images.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10
+X-MIR (ConvNextv2) 67.78 65.26 63.85 67.78 92.22 95.56 60.70
+RwA (ResNet-Attn) 63.46 62.80 61.83 63.46 94.20 97.17 56.92
+BioMedCLIP 60.91 57.20 55.30 60.91 89.60 94.10 48.70
+DINOv2 (ISIC-tuned) 69.17 63.73 62.00 69.17 93.33 97.17 55.16
+CheXFound 63.20 60.40 58.70 63.20 90.60 95.20 51.40
+Ours (Proposed) 71.35 68.90 66.45 71.35 95.20 98.05 63.82
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section that lists the topics or sections of the document with corresponding page numbers or links, which is typical of a table of contents. Instead, it contains tables summarizing datasets and performance comparisons.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 11
+Table 5.Comparative analysis on the TBX11K dataset. Our approach sets a new state-of-the-art
+for tuberculosis case retrieval.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10 (%)
+X-MIR (ConvNextv2) 98.70 98.94 98.98 98.70 99.49 99.71 98.99
+RwA (ResNet-Attn) 98.91 98.78 98.66 98.91 99.49 99.49 97.98
+BioMedCLIP 93.10 91.85 90.40 93.10 97.10 98.20 87.30
+DINOv2 (ISIC-tuned) 96.20 94.80 93.10 96.20 99.10 99.65 87.40
+CheXFound 96.10 95.40 94.80 96.10 99.20 99.70 93.60
+Ours (Proposed) 99.15 99.30 99.42 99.15 99.75 99.88 99.20
+Experimental results across all three benchmarks demonstrate that our proposed
+framework consistently outperforms existing state-of-the-art backbones, achieving su-
+perior retrieval precision and ranking quality across diverse medical modalities and
+pathologies
+3.2 Explainable AI Cases Studies
+To evaluate the clinical utility of the proposedCRARframework, we conduct two cru-
+cial case studies focusing on common radiographic findings. Unlike traditional heatmaps,
+CRAR provides a "doctor-like" probe by aligning retrieved images with specific medi-
+cal concepts.
+Fig. 5. Focal Pathological Grounding. (a) Query image. (b) Baseline relies on diffuse anatomi-
+cal shortcuts. (c) CRAR precisely localizes specific concepts (e.g., Lung cyst, Clavical fracture),
+ensuring retrieval is driven by pathological evidence rather than background noise.
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section listings or chapter titles that would typically be found in a table of contents. It appears to be a segment from a research paper, containing a table of comparative analysis and some discussion text, but lacks the structural overview characteristic of a table of contents.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 12 Tu N. V . et al.
+Case Study I: Focal Pathological Grounding.In scenarios involving localized anoma-
+lies, such aslung cystorclavical fracture, CRAR demonstrates superior precision in
+spatial grounding. As shown inFigure 5, while global retrieval models may match im-
+ages based on general lung shape (anatomical shortcuts), CRAR explicitly identifies the
+top-Kconcepts (e.g., “lung cyst”) and localizes them to the corresponding pathologi-
+cal patches. The high alignment score¯a jiwithin the lesion manifold confirms that the
+retrieval decision is driven by the pathology itself rather than background noise.
+Fig. 6. Resolving False Positives.CRAR-based auditing of retrieval results. While the retrieval
+system returns visually similar CXRs, CRAR performs concept-level comparison between the
+query and retrieved images. Cases lacking pathological concept alignment are flagged asUn-
+matchedand excluded, thereby resolving potential false positives.
+Case Study II: Resolving False Positives.A critical advantage of our xAI approach
+is the ability to audit "false positive" retrievals. In instances where the visual similarity
+is high but the clinical concept is mismatched (e.g., a skin fold mimicking a pneu-
+mothorax), the CRAR alignment scores remain below the thresholdτ. As evidenced in
+Figure 6, the lack of localized concept grounding provides an immediate visual cue to
+the clinician that the retrieved case lacks the specific pathological evidence required for
+a confirmed match, thereby reducing the risk of diagnostic over-reliance on black-box
+predictions.
+3.3 Texture-Saliency Paradox Explain
+As discussed above, although Vision Transformer (ViT)-based models such as Med-
+SigLIP are pretrained on large-scale medical datasets, our experiments show that their
+embeddings are not necessarily optimal for medical image retrieval. We observe a dis-
+crepancy between retrieval performance and the spatial evidence highlighted by the
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section that lists the contents of the document with corresponding page numbers or identifiers, which is typical of a table of contents. It appears to be a segment from a research paper, discussing specific case studies and findings without providing an overview of the document's structure.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 13
+model, which we refer to as thetexture–saliency paradox. One explanation lies in the ar-
+chitectural differences between CNN-based encoders and ViT-style architectures. ViTs
+rely on patch tokenization and self-attention to capture high-level semantic concepts,
+but this design may weaken the preservation of continuous spatial structures. In chest
+radiography, pathological cues often appear as subtle textures or diffuse patterns across
+anatomical regions. Due to the lack of strong local inductive bias, ViT embeddings may
+fail to consistently capture these structural signals, whereas convolutional architectures
+preserve spatial locality and are therefore better suited for modeling anatomical struc-
+tures and texture patterns relevant for retrieval.
+Fig. 7.Comparison of saliency maps between CLIP-based and CNN-based retrieval models. The
+CNN model highlights broader lung structures, while the CLIP model focuses on narrow activa-
+tion regions.
+To further analyze this phenomenon, we perform an explainability-based evaluation
+of the learned embeddings. After training on the COVIDx dataset, we generate saliency
+maps indicating which image regions contribute most to the similarity score between
+the query and retrieved images. For CNN-based models, we compute similarity-based
+saliency maps, while for ViT-based models we use Similarity Grad-CAM. The expla-
+nations are evaluated using two metrics:Insertion, which measures how quickly the
+similarity score increases when important pixels are added, andDeletion, which mea-
+sures how quickly the score decreases when these pixels are removed. As illustrated in
+Figure 7, CLIP-based models tend to focus on narrow and fragmented regions, whereas
+CNN-based models highlight broader and more continuous lung structures and lesions.
+Consistent with these observations, the quantitative results in Table 6 show that CNN
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section listings or chapter titles that would typically be found in a table of contents. It appears to be a segment from a research paper discussing specific aspects of medical image retrieval models.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 14 Tu N. V . et al.
+backbones achieve higher Insertion scores, indicating that the regions identified by
+CNNs contribute more reliably to similarity computation.
+Table 6.xAI evaluation across COVIDx, ISIC, and TBX 11k datasets.↑indicates higher is better,
+↓indicates lower is better.
+Backbone COVIDx CXR ISIC TBX 11k
+Ins↑Del↓Ins↑Del↓Ins↑Del↓
+DenseNet121 0.84430.64790.6742 0.5526 0.9230.691
+MedSigLIP 0.7455 0.6837 0.6191 0.7408 0.792 0.727
+ResNet50 0.7783 0.6568 0.90570.70560.884 0.728
+ConvNeXtV20.91850.70720.91870.71530.9640.752
+MedCLIP 0.7123 0.6679 0.642 0.708 0.743 0.662
+4 Discussion
+We investigated the effectiveness of different backbone architectures for medical image
+retrieval and proposed a Multi-View Ensemble with Spatial Residual Attention frame-
+work. The key idea is to combine complementary representations from two perspec-
+tives: one backbone captures global semantic structures, while the other focuses on
+localized lesion patterns that are critical for medical diagnosis. By integrating these
+representations, the ensemble improves retrieval robustness compared to using a single
+backbone.
+To enhance interpretability, we introduce a Concept-to-Region Alignment for Re-
+trieval (CRAR) mechanism. Rather than relying solely on traditional saliency maps,
+CRAR aligns visually important regions in the query image with similar pathological
+patterns in retrieved cases. This provides more informative explanations for similarity-
+based retrieval and may help clinicians better understand the reasoning behind the re-
+trieved results.
+Our experiments also show that conventional convolutional neural network archi-
+tectures, particularly ConvNeXtV2, remain highly competitive for medical image re-
+trieval. When fine-tuned on domain-specific datasets, these models can outperform sev-
+eral biomedical foundation models. This suggests that medical image retrieval relies
+strongly on fine-grained texture patterns, which are effectively captured by convolu-
+tional architectures.
+5 Conclusion
+In this work, we demonstrated that combining complementary feature representations
+can improve the robustness of medical image retrieval systems across multiple datasets.
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain any section that lists the contents of the document with corresponding page numbers or section markers, which is typical for a table of content. It starts directly with numbered sections and content without an introductory list.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: Clinical-Inspired Multi-View Medical Image Retrieval 15
+Our proposed Multi-View Ensemble with Spatial Residual Attention leverages both
+global semantic embeddings and localized lesion-focused features. Our experiments
+also reveal an interesting phenomenon in which conventional CNN backbones outper-
+form several specialized medical vision-language models when fine-tuned for retrieval
+tasks. This observation suggests a texture–saliency discrepancy in medical image re-
+trieval systems. Future work should investigate more reliable explanation techniques
+and evaluate the proposed retrieval explanations through user studies with clinicians.
+References
+1. Ayhan, M.S., et al.: Clinical validation of saliency maps for understanding deep neural net-
+works in ophthalmology. Medical Image Analysis77(2022)
+2. Codella, N.C., Gutman, D., Celebi, M.E., Helba, B., Marchetti, M.A., Dusza, S.W., Kalloo,
+A., Liopyris, K., Mishra, N., Kittler, H., et al.: Skin lesion analysis toward melanoma detec-
+tion: A challenge at the 2017 international symposium on biomedical imaging (isbi), hosted
+by the international skin imaging collaboration (isic). In: 2018 IEEE 15th international sym-
+posium on biomedical imaging (ISBI 2018). pp. 168–172. IEEE (2018)
+3. Denner, S., et al.: Leveraging foundation models for content-based image retrieval in radiol-
+ogy. Computers in Biology and Medicine196, Part A (2025)
+4. Douze, M., Guzhva, A., Deng, C., Johnson, J., Szilvasy, G., Mazaré, P.E., Lomeli, M., Hos-
+seini, L., Jégou, H.: The faiss library. arXiv preprint arXiv:2401.08281 (2024).https:
+//doi.org/10.48550/arXiv.2401.08281
+5. Gassner, M., et al.: Saliency-enhanced content-based image retrieval for diagnosis support
+in dermatology. JMIR Dermatology (2023)
+6. He, K., Zhang, X., Ren, S., Sun, J.: Deep residual learning for image recognition. In: Pro-
+ceedings of the IEEE conference on computer vision and pattern recognition. pp. 770–778
+(2016)
+7. Hu, B., Vasu, B., Hoogs, A.: X-mir: Explainable medical image retrieval. In: Proceedings of
+the IEEE/CVF Winter Conference on Applications of Computer Vision. pp. 440–450 (2022)
+8. Huang, G., Liu, Z., Van Der Maaten, L., Weinberger, K.Q.: Densely connected convolutional
+networks. In: Proceedings of the IEEE conference on computer vision and pattern recogni-
+tion. pp. 4700–4708 (2017)
+9. Lehmann, T.M., et al.: Content-based image retrieval in medical applications. Methods of
+Information in Medicine43(4), 354–361 (2004)
+10. Liu, Y ., Wu, Y .H., Ban, Y ., Wang, H.Z., Cheng, M.M.: Tbx11k: A large-scale chest x-ray
+dataset for tuberculosis conscious medical ai applications. In: Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR). pp. 14009–14018 (2020)
+11. Nguyen, H.Q., Lam, K., Le, L.T., Pham, H.H., Tran, D.Q., Nguyen, D.B., Le, D.D., Pham,
+C.M., Tong, H.T., Diep, D.H., et al.: Vindr-cxr: An open dataset of chest x-rays with radiol-
+ogist’s annotations. Scientific Data9(1), 429 (2022)
+12. Nie, Y ., He, S., Bie, Y ., Wang, Y ., Chen, Z., Yang, S., Cai, Z., Wang, H., Wang, X., Luo, L.,
+Wu, M., Wu, X., Chan, R.C.K., Lau, Y .M., Zheng, Y ., Rajpurkar, P., Chen, H.: An explainable
+biomedical foundation model via large-scale concept-enhanced vision-language pre-training.
+arXiv preprint arXiv:2501.15579 (2025)
+13. Oquab, M., Darcet, T., Moutakanni, T., V o, H.V ., et al.: Dinov2: Learning robust visual fea-
+tures without supervision. arXiv preprint arXiv:2304.07193 (2023)
+14. Patrício, C., et al.: Cbvlm: Training-free explainable concept-based large vision language
+models for medical image classification. Computers in Biology and Medicine (2025)
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text does not contain a section that outlines the structure of the document with headings and page numbers, which is typical of a table of contents. It starts directly with the main content followed by references.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    Your job is to detect if there is a table of content provided in the given text.
+
+    Given text: 16 Tu N. V . et al.
+15. Wang, L., Lin, Z.Q., Wong, A.: Covid-net: A tailored deep convolutional neural network
+design for detection of covid-19 cases from chest x-ray images. Scientific Reports10(1),
+1–11 (2020)
+16. Wang, Z., et al.: Medclip: Contrastive learning from unpaired medical images and text.
+EMNLP (2022)
+17. Yang, Z., Xu, X., Zhang, J., Wang, G., Kalra, M.K., Yan, P.: Chest x-ray foundation model
+with global and local representations integration. IEEE transactions on medical imaging
+(2025)
+18. Zhai, X., Mustafa, B., Kolesnikov, A., Beyer, L.: Sigmoid loss for language image pre-
+training. arXiv preprint arXiv:2303.15343 (2023)
+19. Zhang, S., et al.: Biomedclip: A multimodal biomedical foundation model. arXiv preprint
+arXiv:2303.00915 (2023)
+20. Zhang, Z., et al.: Mdnet: A semantically and visually interpretable medical image diagnosis
+network. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recogni-
+tion (CVPR) (2017)
+21. Zhong, A., et al.: Deep metric learning-based image retrieval system for chest radiograph
+and its clinical applications in covid-19. Medical Image Analysis70, 101993 (2021)
+22. Zhu, K., Wu, J.: Residual attention: A simple but effective method for multi-label recog-
+nition. In: Proceedings of the IEEE/CVF International Conference on Computer Vision
+(ICCV). pp. 184–193 (2021)
+
+    return the following JSON format:
+    {
+        "thinking": <why do you think there is a table of content in the given text>
+        "toc_detected": "<yes or no>",
+    }
+
+    Directly return the final JSON structure. Do not output anything else.
+    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents.\n[DEBUG] =====================================\n
+\n[DEBUG] === ChatGPT_API Response ===\n{
+    "thinking": "The given text appears to be a list of references or citations rather than a table of contents. Each line contains details about a different publication, including authors, titles, and publication information, which is typical of a reference section.",
+    "toc_detected": "no"
+}\n[DEBUG] =====================================\n
+no toc found
+process_no_toc
+start_index: 1
+start generate_toc_init
+\n[DEBUG] === ChatGPT_API_with_finish_reason Sending to Qwen/Qwen2.5-32B-Instruct ===\n
+    You are an expert in extracting hierarchical tree structure, your task is to generate the tree structure of the document.
+
+    The structure variable is the numeric system which represents the index of the hierarchy section in the table of contents. For example, the first section has structure index 1, the first subsection has structure index 1.1, the second subsection has structure index 1.2, etc.
+
+    For the title, you need to extract the original title from the text, only fix the space inconsistency.
+
+    The provided text contains tags like <physical_index_X> and <physical_index_X> to indicate the start and end of page X. 
+
+    For the physical_index, you need to extract the physical index of the start of the section from the text. Keep the <physical_index_X> format.
+
+    The response should be in the following format. 
+        [
+            {{
+                "structure": <structure index, "x.x.x"> (string),
+                "title": <title of the section, keep the original title>,
+                "physical_index": "<physical_index_X> (keep the format)"
+            }},
+            
+        ],
+
+
+    Directly return the final JSON structure. Do not output anything else.
+Given text
+:<physical_index_1>
+Clinical-Inspired Multi-View Retrieval with Spatial
+Residual Attention and Concept-Driven Explainability
+in Medical Images
+Van Tu Nguyen1,2, Long Pham Nguyen Hai1,2, and Viet V o Hoai1,2,3
+1Faculty of Information Technology, University of Science, Ho Chi Minh City, Vietnam
+2Vietnam National University, Ho Chi Minh City, Vietnam
+{22127434,22127248}@student.hcmus.edu.vn
+vhviet@fit.hcmus.edu.vn
+Abstract.Reliable content-based image retrieval (CBIR) in chest radiography
+requires both accurate semantic understanding and preservation of fine-grained
+pathological textures. While Vision Transformers (ViTs) dominate many vision
+tasks, we identify aTexture–Saliency Paradoxin medical retrieval, where global
+attention mechanisms often overlook subtle high-frequency patterns critical for
+detecting early-stage lesions. To address this limitation, we propose a clinically
+inspired multi-view retrieval framework built on a modernized CNN backbone
+(ConvNeXtV2). The model employs a dual-branch architecture with aCanoni-
+cal Branchfor global anatomical context and anAttentive Refinement Branch
+withSpatial Residual Attention (SRA)to capture localized pathological cues.
+To enhance interpretability, we introduceConcept-to-Region Alignment for
+Retrieval (CRAR), which grounds retrieval decisions in clinically meaningful
+concepts. Experiments on three datasets (COVIDx, ISIC 2017, and TBX11K)
+show that our framework consistently outperforms recent medical transformers,
+including DinoV2, BioMedCLIP, MedSigLIP, and MedCLIP. Quantitative evalu-
+ation using Insertion and Deletion metrics further demonstrates that our concept-
+driven explanations better align with clinical reasoning, enabling reliable and
+interpretable medical image retrieval. Source code can be found here:Github-
+CIMVR2026
+Keywords:Medical Image Retrieval · Chest Radiography · Explainable AI ·
+Spatial Residual Attention · Concept-to-Region Alignment · ConvNeXtV2.
+1 Introduction
+Medical imaging plays a critical role in modern clinical diagnosis. With the rapid
+growth of digital medical archives, content-based image retrieval (CBIR) has emerged
+as a promising decision-support tool that allows clinicians to retrieve previously diag-
+nosed cases with visual patterns similar to a query image. By comparing a current exam-
+ination with historical cases, CBIR systems can provide empirical evidence that helps
+reduce diagnostic uncertainty and supports clinical decision-making. For real clinical
+3Corresponding author. Email: vhviet@fit.hcmus.edu.vn
+<physical_index_1>
+
+<physical_index_2>
+2 Tu N. V . et al.
+deployment, however, retrieval systems must satisfy two essential requirements: they
+must preserve subtle pathological cues and provide interpretable explanations consis-
+tent with clinical reasoning. As illustrated in Fig. 1, a clinically reliable retrieval frame-
+work should not only return visually similar cases but also provide spatially grounded
+explanations that allow clinicians to verify the underlying pathological evidence.
+Fig. 1. Overview of the retrieval-enhanced diagnostic workflow. The system identifies patho-
+logically similar cases and provides saliency maps for spatial grounding, enabling clinicians to
+verify diagnostic evidence and establish trust.
+Despite recent progress in deep learning for medical imaging, two challenges re-
+main unresolved in medical image retrieval. The first challenge is the preservation
+of fine-grained pathological textures. Early CBIR systems relied on handcrafted de-
+scriptors such as texture and shape statistics [9]. Deep convolutional neural networks
+later became the dominant paradigm for extracting visual embeddings, enabling sim-
+ilarity comparison through distance metrics such as cosine similarity. More recently,
+vision–language foundation models have been explored for medical retrieval. For ex-
+ample, Denner et al. [3] demonstrated that CLIP-based medical models can achieve
+competitive performance on radiology datasets without extensive task-specific training.
+However, these models are primarily optimized for cross-modal semantic alignment
+rather than instance-level visual similarity, which may limit their ability to capture sub-
+tle pathological patterns.
+The second challenge is the lack of reliable interpretability in retrieval systems.
+Several studies incorporate explainable AI techniques to visualize model decisions. For
+instance, X-MIR [7] applies Grad-CAM and attention maps to highlight regions con-
+tributing to retrieval results, while other approaches rely on saliency-based explanations
+[5]. However, recent studies suggest that saliency maps may not always align with clin-
+ical reasoning and can highlight regions unrelated to pathology [1,?]. As an alternative,
+concept-based interpretability has gained increasing attention. Zhang et al. [20] intro-
+duced MDNet to represent symptom-level semantics, while Patrício et al. [14] proposed
+a concept-driven vision–language framework for medical explanations.
+These limitations raise an important question:how can we design a retrieval system
+that preserves fine-grained pathological evidence while providing clinically meaningful
+explanations?
+To address this problem, we propose a clinically inspired retrieval framework that
+integrates spatially grounded feature learning with concept-driven explanations. Our
+<physical_index_2>
+
+<physical_index_3>
+Clinical-Inspired Multi-View Medical Image Retrieval 3
+approach employs a modern convolutional architecture,ConvNeXtV2, within a dual-
+branch design to capture both global anatomical context and localized pathological pat-
+terns. The framework consists of aCanonical Branchthat models holistic anatomi-
+cal structure and anAttentive Refinement BranchwithSpatial Residual Attention
+(SRA)to emphasize diagnostically relevant regions. To further enhance interpretabil-
+ity, we introduceConcept-to-Region Alignment for Retrieval (CRAR), which aligns
+retrieval evidence with clinically meaningful concepts and spatial regions.
+Experiments on three medical datasets (COVIDx, ISIC 2017, and TBX11K) demon-
+strate that our framework achieves strong retrieval performance while providing clini-
+cally interpretable explanations. The main contributions of this work are summarized
+as follows:
+1. Multi-View Retrieval Architecture.We propose a dual-branch retrieval frame-
+work with Spatial Residual Attention (SRA) that preserves both global anatomical
+context and localized pathological textures.
+2. Concept-to-Region Alignment for Retrieval (CRAR).We introduce a concept-
+driven explanation module that grounds retrieval results in clinically meaningful
+visual evidence.
+3. Texture–Saliency Paradox Analysis.We provide empirical evidence that modern
+CNN architectures with spatial inductive biases can better preserve fine-grained
+pathological cues than transformer-based models in medical image retrieval.
+2 Methodology
+Fig. 2. Overview of the proposed multi-view ensemble framework. A dual-branch Con-
+vNeXtV2 architecture fuses canonical and attentive features for retrieval, while the Concept-
+to-Region xAI module provides spatial localization of clinical findings (e.g., consolidation) to
+ensure diagnostic interpretability.
+Our research initiates with an evaluation across diverse datasets to identify the most
+robust backbone architectureforradiographic features. Building upon the optimal
+<physical_index_3>
+
+<physical_index_4>
+4 Tu N. V . et al.
+selection, we integrate a spatial residual connection and implement a strategic ensemble
+mechanism, significantly enhancing retrieval precision for complex medical imagery.
+To further bridge the gap between algorithmic performance and clinical transparency,
+we introduce theConcept-to-Region Alignment for Retrieval (CRAR)methodology.
+This approach facilitates a lesion-centric perspective, providing granular localization
+of pathological findings and offering a detailed interpretability layer that aligns the
+model’s internal representations with expert clinical observation.
+2.1 Backbone Selection
+During the backbone selection stage, we evaluated both CNN-based retrieval encoders
+(DenseNet121 [8], ResNet50 [6], ConvNeXtV2) and Vision Transformer (ViT) archi-
+tectures (MedSigLIP [18] and MedCLIP [16]) to analyze their compatibility with med-
+ical image retrieval. Our initial hypothesis was that medical ViT-based models would
+perform better due to their pretraining on paired medical image–text datasets.
+However, the empirical results in Table 1 show that CNN-based architectures con-
+sistently outperform ViT-based models across all datasets, with ConvNeXtV2 achieving
+the best performance in terms of Recall@1 and mAP. This observation reveals an in-
+teresting paradox: despite being pretrained on large-scale medical image–text corpora,
+ViT-based models such as MedSigLIP and MedCLIP perform worse on pure visual
+retrieval tasks. One explanation is that these Transformer-based models are primarily
+optimized for cross-modal semantic alignment rather than instance-level visual similar-
+ity. Their representations tend to capture high-level semantic concepts but may over-
+look subtle structural patterns and fine-grained textures that are crucial in radiological
+images. Medical retrieval tasks often depend on small pathological cues such as faint
+opacities or local tissue irregularities, which require strong spatial sensitivity.
+Table 1.Unified retrieval results across three datasets. For each dataset, we report Recall@K and
+mean Average Precision (mAP). The best results for each dataset are highlighted in bold.
+BackboneCOVIDx ISIC 2017 TBX11K
+R@1 R@5 mAP R@1 R@5 mAP R@1 R@5 mAP
+DenseNet121 88.67 96.33 85.92 64.44 85.19 53.71 97.83 98.70 97.75
+ResNet50 89.33 97.00 88.01 62.9693.7056.42 98.41 99.49 97.98
+ConvNeXtV293.67 97.33 92.32 67.7892.2260.70 98.70 99.49 98.99
+MedSigLIP 87.33 96.33 64.74 61.48 91.11 46.81 93.56 97.90 85.17
+MedCLIP 82.15 91.40 58.20 55.30 86.45 40.12 89.20 94.15 79.45
+Among the evaluated architectures, ConvNeXtV2 provides the most suitable design
+for this task. Its large-kernel depthwise convolutions expand the receptive field while
+preserving local spatial continuity, enabling the model to capture both global anatom-
+ical context and fine-grained pathological textures. In addition, its hierarchical convo-
+<physical_index_4>
+
+<physical_index_5>
+Clinical-Inspired Multi-View Medical Image Retrieval 5
+lutional structure naturally supports multi-scale feature extraction, which is beneficial
+for distinguishing subtle lesion patterns in medical images. Based on these empirical
+results and architectural advantages, we select ConvNeXtV2 as the backbone of our
+retrieval framework.
+2.2 Ensemble-Based Multi-View Integration
+In clinical radiography, diagnostic consensus is seldom reached through a single per-
+spective. Radiologists often analyze medical images from multiple "views," where one
+specialist might focus on subtle structural anomalies (Lesion A) while another identifies
+broader pathological patterns (Lesion B). To replicate this collaborative expertise, we
+propose a Multi-View Ensemble framework utilizing a dual-branch architecture
+Our framework utilizes a dual-branch ensemble: a Canonical Branch that extracts
+raw features to maintain global data integrity, and an Attentive Refinement Branch inte-
+grating Spatial Residual Attention (SRA) to highlight subtle spatial nuances. By fusing
+these complementary views, the model captures both fundamental representations and
+refined diagnostic cues, ensuring a more robust and holistic interpretation of radio-
+graphic data.
+Spatial Residual AttentionIn standard convolutional feature extraction for image
+retrieval, the final spatial feature mapX∈RC×H×Wis typically aggregated into a
+global descriptor via Global Average Pooling (GAP):
+fgap=1
+H·WHX
+i=1WX
+j=1X:,i,j∈RC(1)
+However, GAP assigns equal weight to every spatial location, which dilutes the con-
+tribution of small but diagnostically important regions, such as lesions or nodules that
+may occupy only a fraction of the image.
+To address this limitation, we proposeSpatial Residual Attention (SRA), a lightweight
+attention module that learns to emphasize discriminative spatial regions through mul-
+tiple attention heads with simple flow as can be seen in figure 3. Inspired byClass-
+Specific Residual Attention (CSRA)[22], our formulation replaces the class-specific
+design with a class-agnostic multi-head mechanism better suited for metric learning-
+based retrieval.
+Given the backbone feature mapX∈RC×H×W, SRA computesKspatial atten-
+tion maps using a1×1convolutionW att∈RK×C:
+Ak=softmax
+W(k)
+att∗X
+∈RH×W, k= 1, . . . , K(2)
+where each headkproduces a normalized attention map over the spatial dimensions.
+The attention-weighted feature for each head is then obtained by:
+fk=HX
+i=1WX
+j=1Ak,i,j·X:,i,j∈RC(3)
+<physical_index_5>
+
+<physical_index_6>
+6 Tu N. V . et al.
+Fig. 3. Detail of the Spatial Residual Attention (SRA) mechanism. The module employs par-
+allel GAP and multi-head attention branches, followed by residual integration and L2 normaliza-
+tion, to generate saliency-aware embeddings for robust medical image retrieval.
+TheKhead features are averaged to form the aggregated attention feature:
+fatt=1
+KKX
+k=1fk (4)
+Finally, SRA fuses the GAP feature with the attention-weighted feature via a residual
+connection controlled by a scalar hyperparameterλ:
+fSRA=f gap+λ·f att (5)
+The outputf SRA∈RCpreserves the original backbone dimensionality and is subse-
+quentlyℓ 2-normalized to produce the final retrieval embedding.
+The SRA module introduces onlyK×Clearnable parameters from the1×1
+convolution, making it highly lightweight. In our experiments, we setK= 8attention
+heads andλ= 0.1, which provides a conservative residual contribution that refines the
+embedding without destabilizing training. Unlike CSRA, which ties each attention head
+to a specific class and produces classification logits, SRA operates in a class-agnostic
+manner, allowing the heads to freely discover diverse spatial patterns such as texture,
+boundary, or region-of-interest cues that are beneficial for similarity-based retrieval.
+Ensemble StrategyTo leverage the complementary strengths of the baseline Con-
+vNeXtV2 (with GAP) and the proposed ConvNeXtV2-SRA, we adopt a weighted con-
+catenation ensemble for the final retrieval embedding. Given an input imageI, each
+model produces anℓ 2-normalized embedding:
+eGAP=f ConvNeXtV2 (I)∈RC,e SRA=f ConvNeXtV2-SRA (I)∈RC(6)
+The ensemble embedding is formed by weighted concatenation:
+eens= [α·e GAP∥β·e SRA]∈R2C(7)
+<physical_index_6>
+
+<physical_index_7>
+Clinical-Inspired Multi-View Medical Image Retrieval 7
+where∥denotes concatenation and (α,β) are scalar weights satisfyingα+β= 1.
+The fused embedding is thenℓ 2-normalized before computing pairwise distances for
+retrieval.
+The weighted concatenation approach ensures that the global context from the Canon-
+ical branch and the localized saliency from the SRA branch are preserved in a unified
+high-dimensional manifold. This process is formalized in Algorithm 1.
+Algorithm 1Multi-View Ensemble Embedding Extraction
+Require:Input imageI, weightsα, β, backbonesf GAP, fSRA
+Ensure:Final ensemble embeddinge ens
+1:f GAP←f GAP(I){Extract Canonical features}
+2:f SRA←f SRA(I){Extract Attentive Refinement features}
+3:e GAP←fGAP
+∥fGAP∥2,e SRA←fSRA
+∥fSRA∥2{ℓ2-normalization}
+4:e concat←[α·e GAP∥β·e SRA]{Weighted concatenation}
+5:e ens←econcat
+∥econcat∥2{Final normalization for cosine similarity}
+6:returne ens
+Weight Selection via Test-Time Augmentation.Rather than manually tuningαandβ,
+we determine them empirically using Test-Time Augmentation (TTA). For each candi-
+date weight pair(α, β)∈ {(0.1,0.9),(0.2,0.8), . . . ,(0.9,0.1)}, we evaluate retrieval
+performance on the validation set under TTA where each query image is augmented
+with horizontal flips and multi-scale crops, and the resulting embeddings are averaged
+before fusion. The weight pair that maximizes the mean Average Precision (mAP) un-
+der TTA is selected as the final ensemble configuration. This procedure ensures that
+the weight allocation reflects each model’s actual contribution to retrieval quality un-
+der realistic inference conditions, without requiring additional learnable parameters or
+a held-out tuning set.
+2.3 Large-Scale Indexing with FAISS
+To ensure the scalability of our framework in real-world clinical environments, we uti-
+lize the FAISS (Facebook AI Similarity Search) library [4] for efficient vector index-
+ing. Given the high dimensionality of our ensemble embeddings (2C), we implement
+an optimized index structure that supports fast nearest-neighbor search. Specifically,
+the gallery embeddings are stored in a flat index (IndexFlatIP) to maintain maxi-
+mum retrieval precision via Inner Product (which is equivalent to cosine similarity for
+ℓ2-normalized vectors). This indexing pipeline allows the system to query thousands of
+historical radiographs in milliseconds, meeting the performance requirements of time-
+sensitive clinical decision support.
+2.4 Concept-to-Region Alignment for Retrieval (CRAR)
+To overcome the clinical misalignment of post-hoc methods like Grad-CAM, we pro-
+poseConcept-to-Region Alignment for Retrieval (CRAR). This module serves as
+<physical_index_7>
+
+<physical_index_8>
+8 Tu N. V . et al.
+a diagnostic bridge, ensuring that retrieval results are anchored in identifiable patho-
+logical regions. We instantiate CRAR usingConceptCLIP[12] as the foundation, fine-
+tuned on the VinDR-CXR dataset [11] (PhysioNet), which encompasses a diverse range
+of clinical concepts and thoracic abnormalities. This adaptation phase allows the model
+to internalize the broad variability of pathological signatures found in real-world clini-
+cal chest radiographs
+Fine-Grained Visual-Textual Encoding.For an imageI m, the backbonef θextracts
+spatial embeddingsi m∈Rd×rforrpatches. Simultaneously, medical conceptsg m,j
+are derived by mean-pooling token embeddings from the clinical reports at their corre-
+sponding indicesV j:
+gm,j=1
+|Vj|X
+v∈V jtm,v (8)
+Alignment and Refinement.The concept-to-patch similarity matrixA∈Rw×ryields
+alignment scoresa jivia cosine similarity. These are refined to produce a robust rele-
+vance scores jfor each conceptj:
+¯aji= log (1 + exp [z m,n·(−t gaji+bg)])−1, s j= max
+i(¯aji)(9)
+wheret gandb gare learnable parameters. For inference, we retain a set of active con-
+ceptsC={j|s j> τ}.
+Hybrid Ranking Score and Concept Weighting.To compute the final ranking of a
+candidate imageI nrelative to a queryI q, we employ a hybrid scoring mechanism
+that integrates global visual similarity with clinically grounded semantic concepts. This
+formulation ensures that retrieved cases are not only visually similar but also patholog-
+ically consistent.
+Algorithm 2Hybrid Concept-Visual Ranking
+Require:QueryI q, CandidateI n, balancing factorγ, concept weightsΩ={ω j}
+Ensure:Total similarity scoreS total
+1:Visual Similarity:
+2:S vis←1+cos(e q,en)
+2{Normalized cosine similarity}
+3:Semantic Concept Overlap:
+4: Identify shared conceptsJ ← C q∩ Cn
+5:S concept←0,Z←0
+6:for allconceptj∈ Jdo
+7:c align←min(s(q)
+j, s(n)
+j){Concept confidence alignment}
+8:S concept←S concept +ωj·calign
+9:Z←Z+ω j
+10:end for
+11:ifZ >0then
+12:S concept←S concept/Z{Weight normalization}
+13:end if
+14:Hybrid Fusion:
+15:S total←(1−γ)·S vis+γ·S concept
+16:returnS total
+<physical_index_8>
+
+<physical_index_9>
+Clinical-Inspired Multi-View Medical Image Retrieval 9
+The weighting coefficientγ∈[0,1]controls the balance between visual similarity
+and semantic concept agreement and is determined empirically on the validation set.
+The concept weightω jreflects the clinical importance of specific findings. For example,
+critical abnormalities (e.g., pneumothorax) are assigned higher weights than generic
+anatomical descriptors (e.g., normal lung). This design penalizes retrievals driven by
+superficial anatomical similarity and instead prioritizes matches supported by clinically
+meaningful evidence.
+Multimodal XAI and Spatial Grounding.CRAR provides inherent interpretability
+by back-projecting the alignment scores¯a jionto the image manifold. This explicitly
+localizes each conceptj(as shown in Fig. 4), enabling clinicians to verify that the
+retrieved samples share not only a global visual likeness but also a common pathological
+site.
+Fig. 4. Qualitative results of CRAR.Heatmaps derived from alignment scores¯a jilocalize
+shared clinical concepts across query and retrieved images. This validates that the retrieval pro-
+cess is driven by pathological evidence rather than anatomical shortcuts.
+3 Experiment
+3.1 Retrieval Evaluation
+We validate our framework across three datasets covering distinct medical domains:
+COVIDx CXRfor COVID-19 detection,ISIC 2017for skin lesion analysis, andTBX11K
+for tuberculosis screening. Dataset statistics and evaluation setups are summarized in
+Table 2. Following standard protocols, we adopt an 80/20 split for the radiographic
+datasets to construct the retrieval galleries.
+<physical_index_9>
+
+<physical_index_10>
+10 Tu N. V . et al.
+Table 2.Summary of evaluation datasets.
+Dataset Modality Pathology Total Samples
+COVIDx CXR [15] Chest X-ray COVID-19 vs. Normal∼14,000
+ISIC 2017 [2] Dermoscopy Skin Lesions∼2,000 (Eval)
+TBX11K [10] Chest X-ray Tuberculosis∼11,000
+Evaluation Metrics.Given a queryq, the system extracts feature embeddings via the
+backbone and retrieves the top-Ksimilar samples from the gallery using cosine similar-
+ity. To quantify performance, we employ standard metrics:Precision@KandRecall@K
+to measure relevance and retrieval coverage, and mean Average Precision (mAP) to as-
+sess overall ranking quality.
+Table 3.Performance comparison on the COVIDx CXR dataset. Our method achieves the highest
+retrieval accuracy in COVID-19 screening.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10 (%)
+X-MIR (ConvNextv2) [7] 93.67 93.40 92.97 93.67 97.33 98.33 92.32
+RwA (ResNet-Attn) [21] 81.00 79.33 78.47 81.00 94.00 96.00 72.80
+BioMedCLIP [19] 90.33 88.10 86.72 90.33 96.90 97.50 86.45
+DINOv2 (Chest-tuned) [13] 83.40 88.40 86.75 91.20 97.85 98.90 83.40
+CheXFound [17] 91.80 90.20 88.90 91.80 97.60 98.70 90.10
+Ours (Proposed) 95.12 94.85 94.30 95.12 98.45 99.10 94.25
+Table 4.Evaluation results on the ISIC 2017 dataset for skin lesion retrieval, demonstrating robust
+performance on non-radiographic images.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10
+X-MIR (ConvNextv2) 67.78 65.26 63.85 67.78 92.22 95.56 60.70
+RwA (ResNet-Attn) 63.46 62.80 61.83 63.46 94.20 97.17 56.92
+BioMedCLIP 60.91 57.20 55.30 60.91 89.60 94.10 48.70
+DINOv2 (ISIC-tuned) 69.17 63.73 62.00 69.17 93.33 97.17 55.16
+CheXFound 63.20 60.40 58.70 63.20 90.60 95.20 51.40
+Ours (Proposed) 71.35 68.90 66.45 71.35 95.20 98.05 63.82
+<physical_index_10>
+
+<physical_index_11>
+Clinical-Inspired Multi-View Medical Image Retrieval 11
+Table 5.Comparative analysis on the TBX11K dataset. Our approach sets a new state-of-the-art
+for tuberculosis case retrieval.
+BackbonemP@K R@K mAP
+1 5 10 1 5 10 (%)
+X-MIR (ConvNextv2) 98.70 98.94 98.98 98.70 99.49 99.71 98.99
+RwA (ResNet-Attn) 98.91 98.78 98.66 98.91 99.49 99.49 97.98
+BioMedCLIP 93.10 91.85 90.40 93.10 97.10 98.20 87.30
+DINOv2 (ISIC-tuned) 96.20 94.80 93.10 96.20 99.10 99.65 87.40
+CheXFound 96.10 95.40 94.80 96.10 99.20 99.70 93.60
+Ours (Proposed) 99.15 99.30 99.42 99.15 99.75 99.88 99.20
+Experimental results across all three benchmarks demonstrate that our proposed
+framework consistently outperforms existing state-of-the-art backbones, achieving su-
+perior retrieval precision and ranking quality across diverse medical modalities and
+pathologies
+3.2 Explainable AI Cases Studies
+To evaluate the clinical utility of the proposedCRARframework, we conduct two cru-
+cial case studies focusing on common radiographic findings. Unlike traditional heatmaps,
+CRAR provides a "doctor-like" probe by aligning retrieved images with specific medi-
+cal concepts.
+Fig. 5. Focal Pathological Grounding. (a) Query image. (b) Baseline relies on diffuse anatomi-
+cal shortcuts. (c) CRAR precisely localizes specific concepts (e.g., Lung cyst, Clavical fracture),
+ensuring retrieval is driven by pathological evidence rather than background noise.
+<physical_index_11>
+
+<physical_index_12>
+12 Tu N. V . et al.
+Case Study I: Focal Pathological Grounding.In scenarios involving localized anoma-
+lies, such aslung cystorclavical fracture, CRAR demonstrates superior precision in
+spatial grounding. As shown inFigure 5, while global retrieval models may match im-
+ages based on general lung shape (anatomical shortcuts), CRAR explicitly identifies the
+top-Kconcepts (e.g., “lung cyst”) and localizes them to the corresponding pathologi-
+cal patches. The high alignment score¯a jiwithin the lesion manifold confirms that the
+retrieval decision is driven by the pathology itself rather than background noise.
+Fig. 6. Resolving False Positives.CRAR-based auditing of retrieval results. While the retrieval
+system returns visually similar CXRs, CRAR performs concept-level comparison between the
+query and retrieved images. Cases lacking pathological concept alignment are flagged asUn-
+matchedand excluded, thereby resolving potential false positives.
+Case Study II: Resolving False Positives.A critical advantage of our xAI approach
+is the ability to audit "false positive" retrievals. In instances where the visual similarity
+is high but the clinical concept is mismatched (e.g., a skin fold mimicking a pneu-
+mothorax), the CRAR alignment scores remain below the thresholdτ. As evidenced in
+Figure 6, the lack of localized concept grounding provides an immediate visual cue to
+the clinician that the retrieved case lacks the specific pathological evidence required for
+a confirmed match, thereby reducing the risk of diagnostic over-reliance on black-box
+predictions.
+3.3 Texture-Saliency Paradox Explain
+As discussed above, although Vision Transformer (ViT)-based models such as Med-
+SigLIP are pretrained on large-scale medical datasets, our experiments show that their
+embeddings are not necessarily optimal for medical image retrieval. We observe a dis-
+crepancy between retrieval performance and the spatial evidence highlighted by the
+<physical_index_12>
+
+<physical_index_13>
+Clinical-Inspired Multi-View Medical Image Retrieval 13
+model, which we refer to as thetexture–saliency paradox. One explanation lies in the ar-
+chitectural differences between CNN-based encoders and ViT-style architectures. ViTs
+rely on patch tokenization and self-attention to capture high-level semantic concepts,
+but this design may weaken the preservation of continuous spatial structures. In chest
+radiography, pathological cues often appear as subtle textures or diffuse patterns across
+anatomical regions. Due to the lack of strong local inductive bias, ViT embeddings may
+fail to consistently capture these structural signals, whereas convolutional architectures
+preserve spatial locality and are therefore better suited for modeling anatomical struc-
+tures and texture patterns relevant for retrieval.
+Fig. 7.Comparison of saliency maps between CLIP-based and CNN-based retrieval models. The
+CNN model highlights broader lung structures, while the CLIP model focuses on narrow activa-
+tion regions.
+To further analyze this phenomenon, we perform an explainability-based evaluation
+of the learned embeddings. After training on the COVIDx dataset, we generate saliency
+maps indicating which image regions contribute most to the similarity score between
+the query and retrieved images. For CNN-based models, we compute similarity-based
+saliency maps, while for ViT-based models we use Similarity Grad-CAM. The expla-
+nations are evaluated using two metrics:Insertion, which measures how quickly the
+similarity score increases when important pixels are added, andDeletion, which mea-
+sures how quickly the score decreases when these pixels are removed. As illustrated in
+Figure 7, CLIP-based models tend to focus on narrow and fragmented regions, whereas
+CNN-based models highlight broader and more continuous lung structures and lesions.
+Consistent with these observations, the quantitative results in Table 6 show that CNN
+<physical_index_13>
+
+<physical_index_14>
+14 Tu N. V . et al.
+backbones achieve higher Insertion scores, indicating that the regions identified by
+CNNs contribute more reliably to similarity computation.
+Table 6.xAI evaluation across COVIDx, ISIC, and TBX 11k datasets.↑indicates higher is better,
+↓indicates lower is better.
+Backbone COVIDx CXR ISIC TBX 11k
+Ins↑Del↓Ins↑Del↓Ins↑Del↓
+DenseNet121 0.84430.64790.6742 0.5526 0.9230.691
+MedSigLIP 0.7455 0.6837 0.6191 0.7408 0.792 0.727
+ResNet50 0.7783 0.6568 0.90570.70560.884 0.728
+ConvNeXtV20.91850.70720.91870.71530.9640.752
+MedCLIP 0.7123 0.6679 0.642 0.708 0.743 0.662
+4 Discussion
+We investigated the effectiveness of different backbone architectures for medical image
+retrieval and proposed a Multi-View Ensemble with Spatial Residual Attention frame-
+work. The key idea is to combine complementary representations from two perspec-
+tives: one backbone captures global semantic structures, while the other focuses on
+localized lesion patterns that are critical for medical diagnosis. By integrating these
+representations, the ensemble improves retrieval robustness compared to using a single
+backbone.
+To enhance interpretability, we introduce a Concept-to-Region Alignment for Re-
+trieval (CRAR) mechanism. Rather than relying solely on traditional saliency maps,
+CRAR aligns visually important regions in the query image with similar pathological
+patterns in retrieved cases. This provides more informative explanations for similarity-
+based retrieval and may help clinicians better understand the reasoning behind the re-
+trieved results.
+Our experiments also show that conventional convolutional neural network archi-
+tectures, particularly ConvNeXtV2, remain highly competitive for medical image re-
+trieval. When fine-tuned on domain-specific datasets, these models can outperform sev-
+eral biomedical foundation models. This suggests that medical image retrieval relies
+strongly on fine-grained texture patterns, which are effectively captured by convolu-
+tional architectures.
+5 Conclusion
+In this work, we demonstrated that combining complementary feature representations
+can improve the robustness of medical image retrieval systems across multiple datasets.
+<physical_index_14>
+
+<physical_index_15>
+Clinical-Inspired Multi-View Medical Image Retrieval 15
+Our proposed Multi-View Ensemble with Spatial Residual Attention leverages both
+global semantic embeddings and localized lesion-focused features. Our experiments
+also reveal an interesting phenomenon in which conventional CNN backbones outper-
+form several specialized medical vision-language models when fine-tuned for retrieval
+tasks. This observation suggests a texture–saliency discrepancy in medical image re-
+trieval systems. Future work should investigate more reliable explanation techniques
+and evaluate the proposed retrieval explanations through user studies with clinicians.
+References
+1. Ayhan, M.S., et al.: Clinical validation of saliency maps for understanding deep neural net-
+works in ophthalmology. Medical Image Analysis77(2022)
+2. Codella, N.C., Gutman, D., Celebi, M.E., Helba, B., Marchetti, M.A., Dusza, S.W., Kalloo,
+A., Liopyris, K., Mishra, N., Kittler, H., et al.: Skin lesion analysis toward melanoma detec-
+tion: A challenge at the 2017 international symposium on biomedical imaging (isbi), hosted
+by the international skin imaging collaboration (isic). In: 2018 IEEE 15th international sym-
+posium on biomedical imaging (ISBI 2018). pp. 168–172. IEEE (2018)
+3. Denner, S., et al.: Leveraging foundation models for content-based image retrieval in radiol-
+ogy. Computers in Biology and Medicine196, Part A (2025)
+4. Douze, M., Guzhva, A., Deng, C., Johnson, J., Szilvasy, G., Mazaré, P.E., Lomeli, M., Hos-
+seini, L., Jégou, H.: The faiss library. arXiv preprint arXiv:2401.08281 (2024).https:
+//doi.org/10.48550/arXiv.2401.08281
+5. Gassner, M., et al.: Saliency-enhanced content-based image retrieval for diagnosis support
+in dermatology. JMIR Dermatology (2023)
+6. He, K., Zhang, X., Ren, S., Sun, J.: Deep residual learning for image recognition. In: Pro-
+ceedings of the IEEE conference on computer vision and pattern recognition. pp. 770–778
+(2016)
+7. Hu, B., Vasu, B., Hoogs, A.: X-mir: Explainable medical image retrieval. In: Proceedings of
+the IEEE/CVF Winter Conference on Applications of Computer Vision. pp. 440–450 (2022)
+8. Huang, G., Liu, Z., Van Der Maaten, L., Weinberger, K.Q.: Densely connected convolutional
+networks. In: Proceedings of the IEEE conference on computer vision and pattern recogni-
+tion. pp. 4700–4708 (2017)
+9. Lehmann, T.M., et al.: Content-based image retrieval in medical applications. Methods of
+Information in Medicine43(4), 354–361 (2004)
+10. Liu, Y ., Wu, Y .H., Ban, Y ., Wang, H.Z., Cheng, M.M.: Tbx11k: A large-scale chest x-ray
+dataset for tuberculosis conscious medical ai applications. In: Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR). pp. 14009–14018 (2020)
+11. Nguyen, H.Q., Lam, K., Le, L.T., Pham, H.H., Tran, D.Q., Nguyen, D.B., Le, D.D., Pham,
+C.M., Tong, H.T., Diep, D.H., et al.: Vindr-cxr: An open dataset of chest x-rays with radiol-
+ogist’s annotations. Scientific Data9(1), 429 (2022)
+12. Nie, Y ., He, S., Bie, Y ., Wang, Y ., Chen, Z., Yang, S., Cai, Z., Wang, H., Wang, X., Luo, L.,
+Wu, M., Wu, X., Chan, R.C.K., Lau, Y .M., Zheng, Y ., Rajpurkar, P., Chen, H.: An explainable
+biomedical foundation model via large-scale concept-enhanced vision-language pre-training.
+arXiv preprint arXiv:2501.15579 (2025)
+13. Oquab, M., Darcet, T., Moutakanni, T., V o, H.V ., et al.: Dinov2: Learning robust visual fea-
+tures without supervision. arXiv preprint arXiv:2304.07193 (2023)
+14. Patrício, C., et al.: Cbvlm: Training-free explainable concept-based large vision language
+models for medical image classification. Computers in Biology and Medicine (2025)
+<physical_index_15>
+
+<physical_index_16>
+16 Tu N. V . et al.
+15. Wang, L., Lin, Z.Q., Wong, A.: Covid-net: A tailored deep convolutional neural network
+design for detection of covid-19 cases from chest x-ray images. Scientific Reports10(1),
+1–11 (2020)
+16. Wang, Z., et al.: Medclip: Contrastive learning from unpaired medical images and text.
+EMNLP (2022)
+17. Yang, Z., Xu, X., Zhang, J., Wang, G., Kalra, M.K., Yan, P.: Chest x-ray foundation model
+with global and local representations integration. IEEE transactions on medical imaging
+(2025)
+18. Zhai, X., Mustafa, B., Kolesnikov, A., Beyer, L.: Sigmoid loss for language image pre-
+training. arXiv preprint arXiv:2303.15343 (2023)
+19. Zhang, S., et al.: Biomedclip: A multimodal biomedical foundation model. arXiv preprint
+arXiv:2303.00915 (2023)
+20. Zhang, Z., et al.: Mdnet: A semantically and visually interpretable medical image diagnosis
+network. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recogni-
+tion (CVPR) (2017)
+21. Zhong, A., et al.: Deep metric learning-based image retrieval system for chest radiograph
+and its clinical applications in covid-19. Medical Image Analysis70, 101993 (2021)
+22. Zhu, K., Wu, J.: Residual attention: A simple but effective method for multi-label recog-
+nition. In: Proceedings of the IEEE/CVF International Conference on Computer Vision
+(ICCV). pp. 184–193 (2021)
+<physical_index_16>
+
+\n[DEBUG] =====================================\nERROR:root:Failed to extract JSON: Extra data: line 1 column 86 (char 85)
+ERROR:root:Failed to parse JSON even after cleanup. Content was: '[\n    {\n        "structure": "1",\n        "title": "Introduction",\n        "physical_index": "<physical_index_1>"\n    },\n    {\n        "structure": "2",\n        "title": "Methodology",\n        "physical_index": "<physical_index_2>"\n    },\n    {\n        "structure": "2.1",\n        "title": "Backbone Selection",\n        "physical_index": "<physical_index_3>"\n    },\n    {\n        "structure": "2.2",\n        "title": "Ensemble-Based Multi-View Integration",\n        "physical_index": "<physical_index_5>"\n    },\n    {\n        "structure": "2.3",\n        "title": "Large-Scale Indexing with FAISS",\n        "physical_index": "<physical_index_7>"\n    },\n    {\n        "structure": "2.4",\n        "title": "Concept-to-Region Alignment for Retrieval (CRAR)",\n        "physical_index": "<physical_index_7>"\n    },\n    {\n        "structure": "3",\n        "title": "Experiment",\n        "physical_index": "<physical_index_9>"\n    },\n    {\n        "structure": "3.1",\n        "title": "Retrieval Evaluation",\n        "physical_index": "<physical_index_9>"\n    },\n    {\n        "structure": "3.2",\n        "title": "Explainable AI Cases Studies",\n        "physical_index": "<physical_index_11>"\n    },\n    {\n        "structure": "3.3",\n        "title": "Texture-Saliency Paradox Explain",\n        "physical_index": "<physical_index_12>"\n    },\n    {\n        "structure": "4",\n        "title": "Discussion",\n        "physical_index": "<physical_index_14>"\n    },\n    {\n        "structure": "5",\n        "title": "Conclusion",\n        "physical_index": "<physical_index_14>"\n    }\n]'
+
+\n[DEBUG] === ChatGPT_API_with_finish_reason Response ===\n[
+    {
+        "structure": "1",
+        "title": "Introduction",
+        "physical_index": "<physical_index_1>"
+    },
+    {
+        "structure": "2",
+        "title": "Methodology",
+        "physical_index": "<physical_index_2>"
+    },
+    {
+        "structure": "2.1",
+        "title": "Backbone Selection",
+        "physical_index": "<physical_index_3>"
+    },
+    {
+        "structure": "2.2",
+        "title": "Ensemble-Based Multi-View Integration",
+        "physical_index": "<physical_index_5>"
+    },
+    {
+        "structure": "2.3",
+        "title": "Large-Scale Indexing with FAISS",
+        "physical_index": "<physical_index_7>"
+    },
+    {
+        "structure": "2.4",
+        "title": "Concept-to-Region Alignment for Retrieval (CRAR)",
+        "physical_index": "<physical_index_7>"
+    },
+    {
+        "structure": "3",
+        "title": "Experiment",
+        "physical_index": "<physical_index_9>"
+    },
+    {
+        "structure": "3.1",
+        "title": "Retrieval Evaluation",
+        "physical_index": "<physical_index_9>"
+    },
+    {
+        "structure": "3.2",
+        "title": "Explainable AI Cases Studies",
+        "physical_index": "<physical_index_11>"
+    },
+    {
+        "structure": "3.3",
+        "title": "Texture-Saliency Paradox Explain",
+        "physical_index": "<physical_index_12>"
+    },
+    {
+        "structure": "4",
+        "title": "Discussion",
+        "physical_index": "<physical_index_14>"
+    },
+    {
+        "structure": "5",
+        "title": "Conclusion",
+        "physical_index": "<physical_index_14>"
+    }
+]\n[DEBUG] =====================================\n
+start verify_toc
+Traceback (most recent call last):
+  File "/home/aaronpham5504/Coding/PageIndexUpdate/run_pageindex.py", line 67, in <module>
+    toc_with_page_number = page_index_main(args.pdf_path, opt)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/Coding/PageIndexUpdate/pageindex/page_index.py", line 1100, in page_index_main
+    return asyncio.run(page_index_builder())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/miniconda3/envs/sat/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/miniconda3/envs/sat/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/miniconda3/envs/sat/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/Coding/PageIndexUpdate/pageindex/page_index.py", line 1075, in page_index_builder
+    structure = await tree_parser(page_list, opt, doc=doc, logger=logger)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/Coding/PageIndexUpdate/pageindex/page_index.py", line 1035, in tree_parser
+    toc_with_page_number = await meta_processor(
+                           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aaronpham5504/Coding/PageIndexUpdate/pageindex/page_index.py", line 989, in meta_processor
+    raise Exception('Processing failed')
+Exception: Processing failed

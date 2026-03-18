@@ -18,17 +18,35 @@ from pathlib import Path
 from types import SimpleNamespace as config
 
 CHATGPT_API_KEY = os.getenv("CHATGPT_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", "EMPTY")
+QWEN_BASE_URL = os.environ.get("QWEN_BASE_URL", "https://llm-le79mk8i-8000.serverless.fptcloud.com/v1")
+
+PAGEINDEX_DEBUG = os.environ.get("PAGEINDEX_DEBUG", "0") == "1"
+
+def get_client_args(model, is_async=False):
+    if model.lower().startswith("qwen"):
+        import httpx
+        http_client = httpx.AsyncClient(verify=False) if is_async else httpx.Client(verify=False)
+        return {"api_key": QWEN_API_KEY, "base_url": QWEN_BASE_URL, "http_client": http_client}
+    if model.startswith("llama") or model.startswith("mixtral") or model.startswith("gemma"):
+        return {"api_key": GROQ_API_KEY, "base_url": "https://api.groq.com/openai/v1"}
+    return {"api_key": CHATGPT_API_KEY}
 
 def count_tokens(text, model=None):
     if not text:
         return 0
-    enc = tiktoken.encoding_for_model(model)
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
     tokens = enc.encode(text)
     return len(tokens)
 
 def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
     max_retries = 10
-    client = openai.OpenAI(api_key=api_key)
+    client_args = get_client_args(model)
+    client = openai.OpenAI(**client_args)
     for i in range(max_retries):
         try:
             if chat_history:
@@ -37,11 +55,18 @@ def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_
             else:
                 messages = [{"role": "user", "content": prompt}]
             
+            if PAGEINDEX_DEBUG:
+                print(f"\\n[DEBUG] === ChatGPT_API_with_finish_reason Sending to {model} ===\\n{prompt}\\n[DEBUG] =====================================\\n")
+            
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=0,
             )
+            
+            if PAGEINDEX_DEBUG:
+                print(f"\\n[DEBUG] === ChatGPT_API_with_finish_reason Response ===\\n{response.choices[0].message.content}\\n[DEBUG] =====================================\\n")
+            
             if response.choices[0].finish_reason == "length":
                 return response.choices[0].message.content, "max_output_reached"
             else:
@@ -60,7 +85,8 @@ def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_
 
 def ChatGPT_API(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
     max_retries = 10
-    client = openai.OpenAI(api_key=api_key)
+    client_args = get_client_args(model)
+    client = openai.OpenAI(**client_args)
     for i in range(max_retries):
         try:
             if chat_history:
@@ -69,12 +95,18 @@ def ChatGPT_API(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
             else:
                 messages = [{"role": "user", "content": prompt}]
             
+            if PAGEINDEX_DEBUG:
+                print(f"\\n[DEBUG] === ChatGPT_API Sending to {model} ===\\n{prompt}\\n[DEBUG] =====================================\\n")
+
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=0,
             )
    
+            if PAGEINDEX_DEBUG:
+                print(f"\\n[DEBUG] === ChatGPT_API Response ===\\n{response.choices[0].message.content}\\n[DEBUG] =====================================\\n")
+
             return response.choices[0].message.content
         except Exception as e:
             print('************* Retrying *************')
@@ -89,14 +121,22 @@ def ChatGPT_API(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
 async def ChatGPT_API_async(model, prompt, api_key=CHATGPT_API_KEY):
     max_retries = 10
     messages = [{"role": "user", "content": prompt}]
+    client_args = get_client_args(model, is_async=True)
     for i in range(max_retries):
         try:
-            async with openai.AsyncOpenAI(api_key=api_key) as client:
+            if PAGEINDEX_DEBUG:
+                print(f"\\n[DEBUG] === ChatGPT_API_async Sending to {model} ===\\n{prompt}\\n[DEBUG] =====================================\\n")
+        
+            async with openai.AsyncOpenAI(**client_args) as client:
                 response = await client.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=0,
                 )
+                
+                if PAGEINDEX_DEBUG:
+                    print(f"\\n[DEBUG] === ChatGPT_API_async Response ===\\n{response.choices[0].message.content}\\n[DEBUG] =====================================\\n")
+                
                 return response.choices[0].message.content
         except Exception as e:
             print('************* Retrying *************')
@@ -122,37 +162,92 @@ def get_json_content(response):
     return json_content
          
 
+import re
+
 def extract_json(content):
-    try:
-        # First, try to extract JSON enclosed within ```json and ```
-        start_idx = content.find("```json")
-        if start_idx != -1:
-            start_idx += 7  # Adjust index to start after the delimiter
-            end_idx = content.rfind("```")
-            json_content = content[start_idx:end_idx].strip()
-        else:
-            # If no delimiters, assume entire content could be JSON
-            json_content = content.strip()
+    """Extract and parse JSON from LLM response text.
+    
+    Handles:
+    - Markdown code blocks (```json ... ```)
+    - Raw JSON objects ({...}) and arrays ([...])
+    - Common LLM quirks: trailing commas, Python None/True/False, extra whitespace
+    """
+    def _clean_json_string(s):
+        """Apply common cleanups to a JSON string before parsing."""
+        s = s.replace('None', 'null')
+        s = s.replace('True', 'true').replace('False', 'false')
+        s = s.replace('\n', ' ').replace('\r', ' ')
+        s = ' '.join(s.split())  # Normalize whitespace
+        return s
 
-        # Clean up common issues that might cause parsing errors
-        json_content = json_content.replace('None', 'null')  # Replace Python None with JSON null
-        json_content = json_content.replace('\n', ' ').replace('\r', ' ')  # Remove newlines
-        json_content = ' '.join(json_content.split())  # Normalize whitespace
+    def _fix_trailing_commas(s):
+        """Remove trailing commas before closing brackets/braces."""
+        s = re.sub(r',\s*}', '}', s)
+        s = re.sub(r',\s*\]', ']', s)
+        return s
 
-        # Attempt to parse and return the JSON object
-        return json.loads(json_content)
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to extract JSON: {e}")
-        # Try to clean up the content further if initial parsing fails
+    def _try_parse(s):
+        """Try parsing JSON, with progressively more aggressive cleanup."""
+        # Attempt 1: direct parse
         try:
-            # Remove any trailing commas before closing brackets/braces
-            json_content = json_content.replace(',]', ']').replace(',}', '}')
-            return json.loads(json_content)
-        except:
-            logging.error("Failed to parse JSON even after cleanup")
-            return {}
+            return json.loads(s)
+        except json.JSONDecodeError:
+            pass
+        # Attempt 2: fix trailing commas
+        try:
+            return json.loads(_fix_trailing_commas(s))
+        except json.JSONDecodeError:
+            pass
+        return None
+
+    try:
+        # Step 1: Try to extract from markdown code blocks
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL)
+        if match:
+            json_content = _clean_json_string(match.group(1))
+            result = _try_parse(json_content)
+            if result is not None:
+                return result
+
+        # Step 2: Try to find the outermost JSON structure (array or object)
+        # Determine whether it's an array or object by finding the first [ or {
+        stripped = content.strip()
+        
+        first_brace = content.find('{')
+        first_bracket = content.find('[')
+        
+        # Decide which is the outermost delimiter
+        if first_bracket != -1 and (first_brace == -1 or first_bracket < first_brace):
+            # It's a JSON array
+            start_idx = first_bracket
+            end_idx = content.rfind(']')
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_content = _clean_json_string(content[start_idx:end_idx+1])
+                result = _try_parse(json_content)
+                if result is not None:
+                    return result
+        
+        if first_brace != -1:
+            # It's a JSON object
+            start_idx = first_brace
+            end_idx = content.rfind('}')
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_content = _clean_json_string(content[start_idx:end_idx+1])
+                result = _try_parse(json_content)
+                if result is not None:
+                    return result
+
+        # Step 3: Last resort — try parsing the whole content as-is
+        json_content = _clean_json_string(content)
+        result = _try_parse(json_content)
+        if result is not None:
+            return result
+
+        logging.error(f"Failed to parse JSON after all attempts. Content was: {repr(content)}")
+        return {}
+
     except Exception as e:
-        logging.error(f"Unexpected error while extracting JSON: {e}")
+        logging.error(f"Unexpected error while extracting JSON: {e} Content was: {repr(content)}")
         return {}
 
 def write_node_id(data, node_id=0):
@@ -411,7 +506,10 @@ def add_preface_if_needed(data):
 
 
 def get_page_tokens(pdf_path, model="gpt-4o-2024-11-20", pdf_parser="PyPDF2"):
-    enc = tiktoken.encoding_for_model(model)
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
     if pdf_parser == "PyPDF2":
         pdf_reader = PyPDF2.PdfReader(pdf_path)
         page_list = []

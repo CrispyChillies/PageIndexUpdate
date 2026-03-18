@@ -28,13 +28,11 @@ async def check_title_appearance(item, page_list, start_index=1, model=None):
     The given section title is {title}.
     The given page_text is {page_text}.
     
-    Reply format:
-    {{
-        
-        "thinking": <why do you think the section appears or starts in the page_text>
-        "answer": "yes or no" (yes if the section appears or starts in the page_text, no otherwise)
-    }}
-    Directly return the final JSON structure. Do not output anything else."""
+    IMPORTANT: Return ONLY a valid JSON object. Do NOT wrap it in markdown code fences. Do NOT add any text before or after the JSON.
+
+    Return in this exact format:
+    {{"thinking": "your reasoning here", "answer": "yes or no"}}
+    """
 
     response = await ChatGPT_API_async(model=model, prompt=prompt)
     response = extract_json(response)
@@ -57,12 +55,11 @@ async def check_title_appearance_in_start(title, page_text, model=None, logger=N
     The given section title is {title}.
     The given page_text is {page_text}.
     
-    reply format:
-    {{
-        "thinking": <why do you think the section appears or starts in the page_text>
-        "start_begin": "yes or no" (yes if the section starts in the beginning of the page_text, no otherwise)
-    }}
-    Directly return the final JSON structure. Do not output anything else."""
+    IMPORTANT: Return ONLY a valid JSON object. Do NOT wrap it in markdown code fences. Do NOT add any text before or after the JSON.
+
+    Return in this exact format:
+    {{"thinking": "your reasoning here", "start_begin": "yes or no"}}
+    """
 
     response = await ChatGPT_API_async(model=model, prompt=prompt)
     response = extract_json(response)
@@ -107,14 +104,13 @@ def toc_detector_single_page(content, model=None):
 
     Given text: {content}
 
-    return the following JSON format:
-    {{
-        "thinking": <why do you think there is a table of content in the given text>
-        "toc_detected": "<yes or no>",
-    }}
+    IMPORTANT: Return ONLY a valid JSON object. Do NOT wrap it in markdown code fences. Do NOT add any text before or after the JSON.
 
-    Directly return the final JSON structure. Do not output anything else.
-    Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents."""
+    Return in this exact format:
+    {{"thinking": "your reasoning here", "toc_detected": "yes or no"}}
+
+    Please note: abstract, summary, notation list, figure list, table list, etc. are not table of contents.
+    """
 
     response = ChatGPT_API(model=model, prompt=prompt)
     # print('response', response)
@@ -205,12 +201,11 @@ def detect_page_index(toc_content, model=None):
 
     Given text: {toc_content}
 
-    Reply format:
-    {{
-        "thinking": <why do you think there are page numbers/indices given within the table of contents>
-        "page_index_given_in_toc": "<yes or no>"
-    }}
-    Directly return the final JSON structure. Do not output anything else."""
+    IMPORTANT: Return ONLY a valid JSON object. Do NOT wrap it in markdown code fences. Do NOT add any text before or after the JSON.
+
+    Return in this exact format:
+    {{"thinking": "your reasoning here", "page_index_given_in_toc": "yes or no"}}
+    """
 
     response = ChatGPT_API(model=model, prompt=prompt)
     json_content = extract_json(response)
@@ -246,19 +241,16 @@ def toc_index_extractor(toc, content, model=None):
 
     The structure variable is the numeric system which represents the index of the hierarchy section in the table of contents. For example, the first section has structure index 1, the first subsection has structure index 1.1, the second subsection has structure index 1.2, etc.
 
-    The response should be in the following JSON format: 
-    [
-        {
-            "structure": <structure index, "x.x.x" or None> (string),
-            "title": <title of the section>,
-            "physical_index": "<physical_index_X>" (keep the format)
-        },
-        ...
-    ]
+    IMPORTANT: Your response must be ONLY a valid JSON array. Do NOT wrap it in markdown code fences. Do NOT add any explanation or text before or after the JSON.
+
+    The response must be a JSON array in exactly this format:
+    [{"structure": "1", "title": "Example Section", "physical_index": "<physical_index_1>"}, {"structure": "1.1", "title": "Example Subsection", "physical_index": "<physical_index_2>"}]
+
+    Each object must have these exact keys: "structure" (string), "title" (string), "physical_index" (string like "<physical_index_X>" or null).
 
     Only add the physical_index to the sections that are in the provided pages.
-    If the section is not in the provided pages, do not add the physical_index to it.
-    Directly return the final JSON structure. Do not output anything else."""
+    If the section is not in the provided pages, set physical_index to null.
+    Return ONLY the JSON array, nothing else."""
 
     prompt = toc_extractor_prompt + '\nTable of contents:\n' + str(toc) + '\nDocument pages:\n' + content
     response = ChatGPT_API(model=model, prompt=prompt)
@@ -452,34 +444,31 @@ def page_list_to_group_text(page_contents, token_lengths, max_tokens=20000, over
 
 def add_page_number_to_toc(part, structure, model=None):
     fill_prompt_seq = """
-    You are given an JSON structure of a document and a partial part of the document. Your task is to check if the title that is described in the structure is started in the partial given document.
+    You are given a JSON structure of a document and a partial part of the document. Your task is to check if the title that is described in the structure is started in the partial given document.
 
     The provided text contains tags like <physical_index_X> and <physical_index_X> to indicate the physical location of the page X. 
 
-    If the full target section starts in the partial given document, insert the given JSON structure with the "start": "yes", and "start_index": "<physical_index_X>".
+    If the full target section starts in the partial given document, set "start": "yes" and "physical_index": "<physical_index_X>".
+    If the full target section does not start in the partial given document, set "start": "no" and "physical_index": null.
 
-    If the full target section does not start in the partial given document, insert "start": "no",  "start_index": None.
+    IMPORTANT: Your response must be ONLY a valid JSON array. Do NOT wrap it in markdown code fences (no ```). Do NOT add any explanation or text before or after the JSON.
 
-    The response should be in the following format. 
-        [
-            {
-                "structure": <structure index, "x.x.x" or None> (string),
-                "title": <title of the section>,
-                "start": "<yes or no>",
-                "physical_index": "<physical_index_X> (keep the format)" or None
-            },
-            ...
-        ]    
+    The response must be a JSON array in exactly this format:
+    [{"structure": "1", "title": "Example", "start": "yes", "physical_index": "<physical_index_1>"}, {"structure": "2", "title": "Example2", "start": "no", "physical_index": null}]
+
+    Each object must have these exact keys: "structure" (string), "title" (string), "start" (string "yes" or "no"), "physical_index" (string or null).
+
     The given structure contains the result of the previous part, you need to fill the result of the current part, do not change the previous result.
-    Directly return the final JSON structure. Do not output anything else."""
+    Return ONLY the JSON array, nothing else."""
 
     prompt = fill_prompt_seq + f"\n\nCurrent Partial Document:\n{part}\n\nGiven Structure\n{json.dumps(structure, indent=2)}\n"
     current_json_raw = ChatGPT_API(model=model, prompt=prompt)
     json_result = extract_json(current_json_raw)
     
-    for item in json_result:
-        if 'start' in item:
-            del item['start']
+    if isinstance(json_result, list):
+        for item in json_result:
+            if 'start' in item:
+                del item['start']
     return json_result
 
 
@@ -507,21 +496,18 @@ def generate_toc_continue(toc_content, part, model="gpt-4o-2024-11-20"):
 
     For the title, you need to extract the original title from the text, only fix the space inconsistency.
 
-    The provided text contains tags like <physical_index_X> and <physical_index_X> to indicate the start and end of page X. \
+    The provided text contains tags like <physical_index_X> and <physical_index_X> to indicate the start and end of page X.
     
     For the physical_index, you need to extract the physical index of the start of the section from the text. Keep the <physical_index_X> format.
 
-    The response should be in the following format. 
-        [
-            {
-                "structure": <structure index, "x.x.x"> (string),
-                "title": <title of the section, keep the original title>,
-                "physical_index": "<physical_index_X> (keep the format)"
-            },
-            ...
-        ]    
+    IMPORTANT: Your response must be ONLY a valid JSON array containing the NEW sections only. Do NOT wrap it in markdown code fences (no ```). Do NOT add any explanation or text before or after the JSON.
 
-    Directly return the additional part of the final JSON structure. Do not output anything else."""
+    The response must be a JSON array in exactly this format:
+    [{"structure": "3", "title": "Results", "physical_index": "<physical_index_5>"}, {"structure": "3.1", "title": "Analysis", "physical_index": "<physical_index_6>"}]
+
+    Each object must have exactly these keys: "structure" (string), "title" (string), "physical_index" (string in "<physical_index_X>" format).
+
+    Return ONLY the JSON array of additional sections, nothing else."""
 
     prompt = prompt + '\nGiven text\n:' + part + '\nPrevious tree structure\n:' + json.dumps(toc_content, indent=2)
     response, finish_reason = ChatGPT_API_with_finish_reason(model=model, prompt=prompt)
@@ -544,18 +530,14 @@ def generate_toc_init(part, model=None):
 
     For the physical_index, you need to extract the physical index of the start of the section from the text. Keep the <physical_index_X> format.
 
-    The response should be in the following format. 
-        [
-            {{
-                "structure": <structure index, "x.x.x"> (string),
-                "title": <title of the section, keep the original title>,
-                "physical_index": "<physical_index_X> (keep the format)"
-            }},
-            
-        ],
+    IMPORTANT: Your response must be ONLY a valid JSON array. Do NOT wrap it in markdown code fences (no ```). Do NOT add any explanation, commentary, or text before or after the JSON.
 
+    The response must be a JSON array in exactly this format:
+    [{"structure": "1", "title": "Introduction", "physical_index": "<physical_index_1>"}, {"structure": "1.1", "title": "Background", "physical_index": "<physical_index_2>"}]
 
-    Directly return the final JSON structure. Do not output anything else."""
+    Each object must have exactly these keys: "structure" (string), "title" (string), "physical_index" (string in "<physical_index_X>" format).
+
+    Return ONLY the JSON array, nothing else."""
 
     prompt = prompt + '\nGiven text\n:' + part
     response, finish_reason = ChatGPT_API_with_finish_reason(model=model, prompt=prompt)
