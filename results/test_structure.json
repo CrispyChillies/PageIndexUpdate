@@ -1,5 +1,6 @@
 {
   "doc_name": "test.pdf",
+  "doc_description": "Research paper on clinically inspired multi-view medical image retrieval with ConvNeXtV2, spatial residual attention, and concept-to-region alignment (CRAR), evaluated on COVIDx, ISIC, and TBX11K datasets.",
   "structure": [
     {
       "title": "Introduction",

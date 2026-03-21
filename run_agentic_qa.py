@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from pageindex.agentic_qa import AgenticPageIndexQA
+from pageindex.doc_selector import load_json_documents, select_document_for_query
 
 
 def build_client(model: str) -> OpenAI:
@@ -43,7 +44,8 @@ def format_citation_line(citation: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Agentic PageIndex QA over tree + on-demand full text")
-    parser.add_argument("--json_path", type=str, required=True, help="Path to PageIndex structure JSON")
+    parser.add_argument("--json_path", type=str, default=None, help="Path to one PageIndex structure JSON")
+    parser.add_argument("--json_dir", type=str, default=None, help="Directory of multiple PageIndex JSON files")
     parser.add_argument("--query", type=str, required=True, help="Question to ask")
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-32B-Instruct", help="LLM model")
     parser.add_argument(
@@ -73,12 +75,70 @@ def main() -> None:
     )
     logger = logging.getLogger("agentic_qa_cli")
 
-    if not os.path.isfile(args.json_path):
-        print(f"Error: JSON file not found: {args.json_path}", file=sys.stderr)
+    if not args.json_path and not args.json_dir:
+        print("Error: provide either --json_path or --json_dir", file=sys.stderr)
         sys.exit(1)
 
-    with open(args.json_path, "r", encoding="utf-8") as f:
-        tree_data = json.load(f)
+    if args.json_path and args.json_dir:
+        print("Error: provide only one of --json_path or --json_dir", file=sys.stderr)
+        sys.exit(1)
+
+    selected_doc_meta = None
+    selection_debug = None
+
+    if args.json_path:
+        if not os.path.isfile(args.json_path):
+            print(f"Error: JSON file not found: {args.json_path}", file=sys.stderr)
+            sys.exit(1)
+        with open(args.json_path, "r", encoding="utf-8") as f:
+            tree_data = json.load(f)
+        selected_doc_meta = {
+            "doc_id": tree_data.get("doc_id") or os.path.splitext(os.path.basename(args.json_path))[0],
+            "doc_title": tree_data.get("doc_title") or tree_data.get("doc_name") or os.path.basename(args.json_path),
+            "doc_description": tree_data.get("doc_description", ""),
+            "path": args.json_path,
+        }
+        selection_debug = {
+            "reason": "Single document mode (--json_path).",
+            "ranking": [
+                {
+                    "doc_id": selected_doc_meta["doc_id"],
+                    "doc_title": selected_doc_meta["doc_title"],
+                    "score": 1.0,
+                }
+            ],
+            "uncertain": False,
+        }
+    else:
+        try:
+            docs = load_json_documents(args.json_dir)
+        except Exception as exc:
+            print(f"Error loading directory: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        if not docs:
+            print(f"Error: no valid JSON files found in {args.json_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        sel = select_document_for_query(args.query, docs)
+        selected = sel.get("selected_doc")
+        if not selected:
+            print("Insufficient evidence: no document could be selected.")
+            print("Selection reason:", sel.get("reason", ""))
+            sys.exit(0)
+
+        selected_doc_meta = {
+            "doc_id": selected.get("doc_id"),
+            "doc_title": selected.get("doc_title"),
+            "doc_description": selected.get("doc_description", ""),
+            "path": selected.get("path"),
+        }
+        selection_debug = {
+            "reason": sel.get("reason", ""),
+            "ranking": sel.get("ranking", []),
+            "uncertain": sel.get("uncertain", False),
+        }
+        tree_data = selected.get("tree_data", {})
 
     try:
         client = build_client(args.model)
@@ -103,6 +163,19 @@ def main() -> None:
     print("\n" + "=" * 70)
     print("AGENTIC PAGEINDEX QA RESULT")
     print("=" * 70)
+    print("Selected document:")
+    print(f"- id: {selected_doc_meta.get('doc_id')}")
+    print(f"- title: {selected_doc_meta.get('doc_title')}")
+    print(f"- path: {selected_doc_meta.get('path')}")
+    if selected_doc_meta.get("doc_description"):
+        print(f"- description: {selected_doc_meta.get('doc_description')}")
+    print("Selection debug:")
+    print(f"- reason: {selection_debug.get('reason', '')}")
+    print(f"- uncertain: {selection_debug.get('uncertain', False)}")
+    if selection_debug.get("ranking"):
+        print("- ranking:")
+        for row in selection_debug["ranking"]:
+            print(f"  - {row.get('doc_id')} | {row.get('doc_title')} | score={row.get('score')}")
     print(f"Query: {args.query}")
     print(f"Evidence sufficient: {result.get('evidence_sufficient', 'no')}")
     print(f"Summary enough: {result.get('summary_enough', 'no')}")
