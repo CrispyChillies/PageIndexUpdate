@@ -135,7 +135,7 @@ def call_llm(client: OpenAI, model: str, user_prompt: str) -> dict:
         temperature=0.0,
         max_tokens=2048,
     )
-    raw = response.choices[0].message.content.strip()
+    raw = (response.choices[0].message.content or "").strip()
 
     # Strip markdown code fences if present
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
@@ -159,6 +159,7 @@ def traverse(
     client: OpenAI,
     model: str,
     verbose: bool = True,
+    log_progress: bool = True,
 ) -> list[dict]:
     """
     Two-pass traversal:
@@ -172,11 +173,12 @@ def traverse(
     all_ids = collect_all_node_ids(top_nodes)
 
     # ---- Pass 1: top-level scan ----
-    print(f"\n{'='*60}")
-    print(f"DOCUMENT: {doc_name}")
-    print(f"QUERY: {query}")
-    print(f"{'='*60}")
-    print("\n[Pass 1] Scanning top-level sections...\n")
+    if log_progress:
+        print(f"\n{'='*60}")
+        print(f"DOCUMENT: {doc_name}")
+        print(f"QUERY: {query}")
+        print(f"{'='*60}")
+        print("\n[Pass 1] Scanning top-level sections...\n")
 
     tree_text_toplevel = build_toplevel_text(top_nodes)
     prompt_pass1 = (
@@ -210,7 +212,8 @@ def traverse(
             # Leaf node — add directly
             final_node_ids.add(nid)
         else:
-            print(f"\n[Pass 2] Drilling into node [{nid}] '{node.get('title')}'...\n")
+            if log_progress:
+                print(f"\n[Pass 2] Drilling into node [{nid}] '{node.get('title')}'...\n")
             subtree_text = build_tree_text(children, depth=0, show_children=True)
             prompt_pass2 = (
                 f"Query: {query}\n\n"

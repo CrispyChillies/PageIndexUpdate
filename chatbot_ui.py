@@ -14,15 +14,12 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from pageindex.agentic_qa import AgenticPageIndexQA
+
 # ── Import traversal helpers from tree_traversal.py ──────────────────────────
 from tree_traversal import (
-    SYSTEM_PROMPT,
-    build_toplevel_text,
-    build_tree_text,
-    call_llm,
     collect_all_node_ids,
     find_node_by_id,
-    traverse,
 )
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -237,69 +234,19 @@ hr {
 load_dotenv()
 QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
 QWEN_BASE_URL = os.getenv("QWEN_BASE_URL", "")
+OPENAI_API_KEY = os.getenv("CHATGPT_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
 
 # ── Helper: create LLM client ─────────────────────────────────────────────────
 @st.cache_resource
-def get_client(api_key: str, base_url: str) -> OpenAI:
-    http_client = httpx.Client(verify=False)
-    return OpenAI(api_key=api_key, base_url=base_url, http_client=http_client)
+def get_client(model_name: str) -> OpenAI:
+    if model_name.lower().startswith("qwen"):
+        http_client = httpx.Client(verify=False)
+        return OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL, http_client=http_client)
 
-
-# ── Helper: answer generation ─────────────────────────────────────────────────
-ANSWER_SYSTEM_PROMPT = """You are a knowledgeable assistant that answers questions based on document excerpts.
-
-You are given:
-1. The user's question.
-2. A set of relevant sections retrieved from a document, each with a title, page range, and summary.
-
-Your task:
-- Answer the question clearly and concisely using ONLY the information in the provided sections.
-- Cite which section(s) you drew information from (e.g., "According to the Methodology section, ...").
-- If the sections do not contain enough information to answer, say so honestly.
-- Format your answer in clean markdown with bullet points or headings where helpful.
-"""
-
-def generate_answer(
-    query: str,
-    retrieved_nodes: list[dict],
-    client: OpenAI,
-    model: str,
-    chat_history: list[dict],
-) -> str:
-    """Generate a final answer from the retrieved nodes + conversation history."""
-    if not retrieved_nodes:
-        return "I couldn't find any relevant sections in the document for your query."
-
-    # Build context from retrieved nodes
-    context_parts = []
-    for i, node in enumerate(retrieved_nodes, 1):
-        title = node.get("title", "Untitled")
-        summary = node.get("summary", "")
-        start = node.get("start_index", "?")
-        end = node.get("end_index", "?")
-        context_parts.append(
-            f"[Section {i}: {title} | Pages {start}–{end}]\n{summary}"
-        )
-    context = "\n\n---\n\n".join(context_parts)
-
-    user_content = (
-        f"Question: {query}\n\n"
-        f"Relevant document sections:\n\n{context}"
-    )
-
-    # Build messages with history (last 6 turns for context)
-    messages = [{"role": "system", "content": ANSWER_SYSTEM_PROMPT}]
-    for turn in chat_history[-6:]:
-        messages.append({"role": turn["role"], "content": turn["content"]})
-    messages.append({"role": "user", "content": user_content})
-
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0.2,
-        max_tokens=2048,
-    )
-    return response.choices[0].message.content.strip()
+    if OPENAI_BASE_URL:
+        return OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+    return OpenAI(api_key=OPENAI_API_KEY)
 
 
 # ── Helper: render tree in sidebar ───────────────────────────────────────────
@@ -341,8 +288,24 @@ with st.sidebar:
 
     model_name = st.text_input(
         "Model",
-        value="Qwen/Qwen2.5-32B-Instruct",
-        help="Model name exposed by your Qwen endpoint",
+        value="gpt-4o-2024-11-20",
+        help="Model name (Qwen/* for Qwen endpoint, otherwise OpenAI-compatible endpoint)",
+    )
+
+    adjacent_pages = st.slider(
+        "Adjacent pages for full-text fallback",
+        min_value=0,
+        max_value=3,
+        value=1,
+        help="When summaries are insufficient, include nearby pages around selected nodes",
+    )
+
+    max_evidence_nodes = st.slider(
+        "Max evidence nodes",
+        min_value=1,
+        max_value=12,
+        value=6,
+        help="Maximum number of selected nodes used to build grounded answer evidence",
     )
 
     st.markdown("### 📄 Document")
@@ -385,10 +348,16 @@ with st.sidebar:
 
     # Credential status
     st.markdown("### 🔐 API Status")
-    if QWEN_API_KEY and QWEN_BASE_URL:
-        st.markdown("🟢 Qwen credentials loaded from `.env`")
+    if model_name.lower().startswith("qwen"):
+        if QWEN_API_KEY and QWEN_BASE_URL:
+            st.markdown("🟢 Qwen credentials loaded from .env")
+        else:
+            st.markdown("🔴 Missing QWEN_API_KEY or QWEN_BASE_URL in .env")
     else:
-        st.markdown("🔴 Missing `QWEN_API_KEY` or `QWEN_BASE_URL` in `.env`")
+        if OPENAI_API_KEY:
+            st.markdown("🟢 OpenAI credentials loaded from .env")
+        else:
+            st.markdown("🔴 Missing CHATGPT_API_KEY or OPENAI_API_KEY in .env")
 
 
 # ══ MAIN AREA ════════════════════════════════════════════════════════════════
@@ -415,9 +384,14 @@ if st.session_state.tree_data is None:
     st.stop()
 
 # Guard: missing credentials
-if not QWEN_API_KEY or not QWEN_BASE_URL:
-    st.error("Qwen API credentials not found. Make sure `QWEN_API_KEY` and `QWEN_BASE_URL` are set in your `.env` file.")
-    st.stop()
+if model_name.lower().startswith("qwen"):
+    if not QWEN_API_KEY or not QWEN_BASE_URL:
+        st.error("Qwen credentials missing. Set QWEN_API_KEY and QWEN_BASE_URL in .env.")
+        st.stop()
+else:
+    if not OPENAI_API_KEY:
+        st.error("OpenAI credentials missing. Set CHATGPT_API_KEY or OPENAI_API_KEY in .env.")
+        st.stop()
 
 # Document label
 doc_node_count = len(collect_all_node_ids(st.session_state.tree_data.get("structure", [])))
@@ -476,83 +450,56 @@ if query:
 
     # Run traversal + generation
     with st.chat_message("assistant", avatar="🤖"):
-        client = get_client(QWEN_API_KEY, QWEN_BASE_URL)
+        client = get_client(model_name)
 
-        # ---- Step 1: Tree traversal ----
-        with st.status("🌲 Traversing document tree...", expanded=False) as status:
+        with st.status("🤖 Running agentic QA (tree -> full text on demand)...", expanded=False) as status:
             tree_data = st.session_state.tree_data
-            top_nodes = tree_data.get("structure", [])
-            all_ids = collect_all_node_ids(top_nodes)
-
-            # Pass 1
-            status.write("Pass 1: Scanning top-level sections...")
-            tree_text_toplevel = build_toplevel_text(top_nodes)
-            prompt_pass1 = (
-                f"Query: {query}\n\n"
-                f"Document tree structure (top-level sections only):\n"
-                f"{tree_text_toplevel}\n\n"
-                f"Identify which top-level sections are relevant to the query."
-            )
-            result1 = call_llm(client, model_name, prompt_pass1)
-            thinking_all = result1.get("thinking", "")
-            selected_top = [
-                nid for nid in result1.get("node_list", []) if nid in all_ids
-            ]
-            status.write(f"→ Selected top-level nodes: {selected_top}")
-
-            # Pass 2
-            final_node_ids: set[str] = set()
-            for nid in selected_top:
-                node = find_node_by_id(top_nodes, nid)
-                if not node:
-                    continue
-                children = node.get("nodes", [])
-                if not children:
-                    final_node_ids.add(nid)
-                else:
-                    status.write(f"Pass 2: Drilling into [{nid}] '{node.get('title')}'...")
-                    subtree_text = build_tree_text(children, depth=0, show_children=True)
-                    prompt_pass2 = (
-                        f"Query: {query}\n\n"
-                        f"You are looking inside the section '{node.get('title')}' "
-                        f"(node {nid}) which has the following sub-sections:\n"
-                        f"{subtree_text}\n\n"
-                        f"Which specific sub-section node(s) best answer the query? "
-                        f"Also include the parent node {nid} itself if its own summary "
-                        f"(not just its children) is directly relevant."
-                    )
-                    result2 = call_llm(client, model_name, prompt_pass2)
-                    thinking_all += "\n\n" + result2.get("thinking", "")
-                    selected_children = [
-                        c for c in result2.get("node_list", []) if c in all_ids
-                    ]
-                    final_node_ids.update(selected_children)
-                    status.write(f"→ Selected: {selected_children}")
-
-            retrieved_nodes = [
-                find_node_by_id(top_nodes, nid)
-                for nid in final_node_ids
-                if find_node_by_id(top_nodes, nid)
-            ]
-
-            status.update(label=f"✅ Found {len(retrieved_nodes)} relevant section(s)", state="complete")
-
-        # ---- Step 2: Answer generation ----
-        with st.spinner("✍️ Generating answer..."):
-            # Build history without node/thinking metadata for the LLM context
-            history_for_llm = [
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages[:-1]  # exclude the just-added user msg
-            ]
-            answer = generate_answer(
-                query=query,
-                retrieved_nodes=retrieved_nodes,
+            agent = AgenticPageIndexQA(
+                tree_data=tree_data,
                 client=client,
                 model=model_name,
-                chat_history=history_for_llm,
             )
 
+            status.write("Step 1: Tree traversal on summaries")
+            status.write("Step 2: Sufficiency check")
+            status.write("Step 3: Optional full-text retrieval")
+            status.write("Step 4: Grounded answer with citations")
+
+            result = agent.answer(
+                query=query,
+                adjacent_pages=adjacent_pages,
+                max_evidence_nodes=max_evidence_nodes,
+            )
+
+            answer = result.get("answer", "")
+            thinking_all = (
+                f"Summary enough: {result.get('summary_enough', 'no')}\n"
+                f"Used full text: {result.get('used_full_text', False)}\n"
+                f"Sufficiency reason: {result.get('summary_sufficiency_reason', '')}\n"
+                f"Evidence sufficient: {result.get('evidence_sufficient', 'no')}\n"
+                f"Insufficient reason: {result.get('insufficient_reason', '')}"
+            )
+
+            top_nodes = tree_data.get("structure", [])
+            retrieved_nodes = []
+            for nid in result.get("retrieved_node_ids", []):
+                node = find_node_by_id(top_nodes, nid)
+                if node:
+                    retrieved_nodes.append(node)
+
+            status.update(label=f"✅ Completed with {len(retrieved_nodes)} retrieved node(s)", state="complete")
+
         st.markdown(answer)
+
+        citations = result.get("citations", [])
+        if citations:
+            st.markdown("### Sources")
+            for c in citations:
+                nid = c.get("node_id", "?")
+                title = c.get("title", "Untitled")
+                start = c.get("start_index", "?")
+                end = c.get("end_index", "?")
+                st.markdown(f"- [{nid}] {title} (pages {start}-{end})")
 
         # Show retrieved nodes
         if retrieved_nodes:

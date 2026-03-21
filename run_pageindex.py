@@ -1,6 +1,7 @@
 import argparse
 import os
 import json
+from datetime import datetime
 from pageindex import *
 from pageindex.page_index_md import md_to_tree
 
@@ -65,6 +66,19 @@ if __name__ == "__main__":
 
         # Process the PDF
         toc_with_page_number = page_index_main(args.pdf_path, opt)
+        toc_with_page_number['source_type'] = 'pdf'
+        toc_with_page_number['source_path'] = os.path.abspath(args.pdf_path)
+        toc_with_page_number['generated_at'] = datetime.utcnow().isoformat() + 'Z'
+        toc_with_page_number['index_options'] = {
+            'model': args.model,
+            'if_add_node_id': args.if_add_node_id,
+            'if_add_node_summary': args.if_add_node_summary,
+            'if_add_doc_description': args.if_add_doc_description,
+            'if_add_node_text': args.if_add_node_text,
+            'toc_check_pages': args.toc_check_pages,
+            'max_pages_per_node': args.max_pages_per_node,
+            'max_tokens_per_node': args.max_tokens_per_node,
+        }
         print('Parsing done, saving to file...')
         
         # Save results
@@ -118,6 +132,20 @@ if __name__ == "__main__":
             if_add_node_text=opt.if_add_node_text,
             if_add_node_id=opt.if_add_node_id
         ))
+
+        toc_with_page_number['source_type'] = 'markdown'
+        toc_with_page_number['source_path'] = os.path.abspath(args.md_path)
+        toc_with_page_number['generated_at'] = datetime.utcnow().isoformat() + 'Z'
+        toc_with_page_number['index_options'] = {
+            'model': args.model,
+            'if_add_node_id': args.if_add_node_id,
+            'if_add_node_summary': args.if_add_node_summary,
+            'if_add_doc_description': args.if_add_doc_description,
+            'if_add_node_text': args.if_add_node_text,
+            'if_thinning': args.if_thinning,
+            'thinning_threshold': args.thinning_threshold,
+            'summary_token_threshold': args.summary_token_threshold,
+        }
         
         print('Parsing done, saving to file...')
         
