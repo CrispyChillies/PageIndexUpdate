@@ -197,10 +197,14 @@ class AgenticPageIndexQA:
 
     def _summary_sufficiency_check(self, query: str, retrieved_nodes: list[dict]) -> dict:
         node_briefs = []
+        retrieved_id_set: set[str] = set()
         for node in retrieved_nodes:
+            node_id = node.get("node_id")
+            if isinstance(node_id, str):
+                retrieved_id_set.add(node_id)
             node_briefs.append(
                 {
-                    "node_id": node.get("node_id"),
+                    "node_id": node_id,
                     "title": node.get("title"),
                     "start_index": node.get("start_index"),
                     "end_index": node.get("end_index"),
@@ -217,26 +221,56 @@ class AgenticPageIndexQA:
             f"{query}\n\n"
             "Retrieved node summaries:\n"
             f"{json.dumps(node_briefs, ensure_ascii=False)}\n\n"
+            "Rules:\n"
+            "- focus_node_ids must list the most relevant node_id values for final answering.\n"
+            "- If any retrieved node is relevant, focus_node_ids must not be empty.\n"
+            "- needs_full_text_node_ids must be a subset of focus_node_ids.\n"
+            "- If summaries are insufficient for specific details, put those node IDs in needs_full_text_node_ids.\n\n"
             "Return JSON with this exact schema:\n"
             "{"
             '\"summary_enough\": \"yes or no\", '
             '\"reason\": \"short reason\", '
-            '\"focus_node_ids\": [\"0001\", \"0002\"]'
+            '\"focus_node_ids\": [\"0001\", \"0002\"], '
+            '\"needs_full_text_node_ids\": [\"0002\"]'
             "}"
         )
         result = self._chat_json(system_prompt, user_prompt)
 
-        summary_enough = result.get("summary_enough", "no")
+        summary_enough_raw = str(result.get("summary_enough", "no")).strip().lower()
         focus_node_ids = result.get("focus_node_ids", [])
+        needs_full_text_node_ids = result.get("needs_full_text_node_ids", [])
         if not isinstance(focus_node_ids, list):
             focus_node_ids = []
+        if not isinstance(needs_full_text_node_ids, list):
+            needs_full_text_node_ids = []
 
-        valid_focus_ids = [nid for nid in focus_node_ids if isinstance(nid, str) and self.tools.is_valid_node_id(nid)]
+        valid_focus_ids = [
+            nid
+            for nid in focus_node_ids
+            if isinstance(nid, str) and self.tools.is_valid_node_id(nid) and nid in retrieved_id_set
+        ]
+        valid_needs_ids = [
+            nid
+            for nid in needs_full_text_node_ids
+            if isinstance(nid, str) and self.tools.is_valid_node_id(nid) and nid in retrieved_id_set
+        ]
+
+        if not valid_focus_ids:
+            # Deterministic fallback to keep the pipeline robust when LLM omits focus IDs.
+            valid_focus_ids = [
+                node.get("node_id")
+                for node in retrieved_nodes
+                if isinstance(node.get("node_id"), str)
+            ]
+
+        valid_focus_set = set(valid_focus_ids)
+        valid_needs_ids = [nid for nid in valid_needs_ids if nid in valid_focus_set]
 
         return {
-            "summary_enough": "yes" if summary_enough == "yes" else "no",
+            "summary_enough": "yes" if summary_enough_raw == "yes" else "no",
             "reason": result.get("reason", ""),
             "focus_node_ids": valid_focus_ids,
+            "needs_full_text_node_ids": valid_needs_ids,
         }
 
     def _build_evidence_packets(
@@ -244,15 +278,37 @@ class AgenticPageIndexQA:
         retrieved_nodes: list[dict],
         summary_enough: bool,
         focus_node_ids: list[str],
+        needs_full_text_node_ids: list[str],
         adjacent_pages: int,
         max_evidence_nodes: int,
-    ) -> tuple[list[dict], bool]:
+    ) -> tuple[list[dict], bool, bool]:
         evidence = []
         used_full_text = False
+        attempted_full_text = False
 
-        retrieved_ids = [n.get("node_id") for n in retrieved_nodes if n.get("node_id")]
-        selected_ids = focus_node_ids or retrieved_ids
+        retrieved_ids = [
+            nid
+            for nid in (n.get("node_id") for n in retrieved_nodes)
+            if isinstance(nid, str)
+        ]
+        selected_ids = [nid for nid in (focus_node_ids or retrieved_ids) if isinstance(nid, str)]
         selected_ids = selected_ids[:max_evidence_nodes]
+        selected_id_set = set(selected_ids)
+
+        fetch_full_text_ids: set[str] = set()
+        if not summary_enough:
+            if needs_full_text_node_ids:
+                fetch_full_text_ids = {
+                    nid for nid in needs_full_text_node_ids if isinstance(nid, str) and nid in selected_id_set
+                }
+            else:
+                # Conservative fallback: expand only focus nodes, never all retrieved nodes.
+                fetch_full_text_ids = {
+                    nid for nid in focus_node_ids if isinstance(nid, str) and nid in selected_id_set
+                }
+                if not fetch_full_text_ids and selected_ids:
+                    # Last-resort guard for malformed sufficiency output.
+                    fetch_full_text_ids = {selected_ids[0]}
 
         for node_id in selected_ids:
             summary_info = self.tools.node_summary_lookup(node_id)
@@ -267,7 +323,8 @@ class AgenticPageIndexQA:
                 "summary": summary_info.get("summary", ""),
             }
 
-            if not summary_enough:
+            if not summary_enough and node_id in fetch_full_text_ids:
+                attempted_full_text = True
                 text_info = self.tools.full_text_retrieval(node_id=node_id, adjacent_pages=adjacent_pages)
                 if text_info and text_info.get("text"):
                     packet["text"] = text_info.get("text", "")
@@ -278,17 +335,71 @@ class AgenticPageIndexQA:
 
             evidence.append(packet)
 
-        return evidence, used_full_text
+        return evidence, used_full_text, attempted_full_text
+
+    def _validate_citations(self, citations: list[Any], evidence_packets: list[dict]) -> list[dict[str, Any]]:
+        evidence_by_id: dict[str, dict[str, Any]] = {}
+        for packet in evidence_packets:
+            node_id = packet.get("node_id")
+            if isinstance(node_id, str):
+                evidence_by_id[node_id] = packet
+
+        validated: list[dict[str, Any]] = []
+        for citation in citations:
+            if not isinstance(citation, dict):
+                continue
+
+            node_id = citation.get("node_id")
+            if not isinstance(node_id, str) or node_id not in evidence_by_id:
+                continue
+
+            evidence = evidence_by_id[node_id]
+            start_index = evidence.get("start_index")
+            end_index = evidence.get("end_index")
+            if not isinstance(start_index, int) or not isinstance(end_index, int):
+                continue
+
+            title = citation.get("title")
+            if not isinstance(title, str) or not title.strip():
+                title = evidence.get("title") or "Untitled"
+
+            cited_start = citation.get("start_index")
+            cited_end = citation.get("end_index")
+            if (
+                not isinstance(cited_start, int)
+                or not isinstance(cited_end, int)
+                or cited_start > cited_end
+                or cited_start != start_index
+                or cited_end != end_index
+            ):
+                cited_start = start_index
+                cited_end = end_index
+
+            validated.append(
+                {
+                    "node_id": node_id,
+                    "title": str(title),
+                    "start_index": cited_start,
+                    "end_index": cited_end,
+                }
+            )
+
+        return validated
 
     def _grounded_answer(self, query: str, evidence_packets: list[dict]) -> dict:
+        allowed_node_ids = [packet.get("node_id") for packet in evidence_packets if packet.get("node_id")]
         system_prompt = (
-            "You are a rigorous QA assistant. Answer only with provided evidence. "
-            "If evidence is insufficient, say insufficient evidence explicitly. "
+            "You are a rigorous QA assistant. Use only the provided evidence packets. "
+            "Do not use outside knowledge or assumptions. "
+            "If evidence is insufficient, state this clearly. "
+            "Citations must only use node_id values from provided evidence packets. "
             "Return strict JSON only."
         )
         user_prompt = (
             "Query:\n"
             f"{query}\n\n"
+            "Allowed citation node_ids:\n"
+            f"{json.dumps(allowed_node_ids, ensure_ascii=False)}\n\n"
             "Evidence packets:\n"
             f"{json.dumps(evidence_packets, ensure_ascii=False)}\n\n"
             "Return JSON using this exact schema:\n"
@@ -340,23 +451,33 @@ class AgenticPageIndexQA:
             sufficiency.get("reason", ""),
         )
 
-        evidence_packets, used_full_text = self._build_evidence_packets(
+        evidence_packets, used_full_text, attempted_full_text = self._build_evidence_packets(
             retrieved_nodes=retrieved_nodes,
             summary_enough=summary_enough,
             focus_node_ids=sufficiency.get("focus_node_ids", []),
+            needs_full_text_node_ids=sufficiency.get("needs_full_text_node_ids", []),
             adjacent_pages=adjacent_pages,
             max_evidence_nodes=max_evidence_nodes,
         )
+
+        full_text_unavailable_reason = ""
+        if not summary_enough and attempted_full_text and not used_full_text:
+            full_text_unavailable_reason = (
+                "Full-text expansion was requested but unavailable for selected nodes. "
+                "The JSON appears to include summaries only (no node text), and source document pages "
+                "could not be loaded from source_path."
+            )
 
         if not evidence_packets:
             return {
                 "answer": "Insufficient evidence: unable to collect evidence packets from retrieved nodes.",
                 "evidence_sufficient": "no",
-                "insufficient_reason": "No usable evidence packets found.",
+                "insufficient_reason": full_text_unavailable_reason or "No usable evidence packets found.",
                 "citations": [],
                 "retrieved_node_ids": [n.get("node_id") for n in retrieved_nodes if n.get("node_id")],
                 "summary_enough": "yes" if summary_enough else "no",
                 "used_full_text": used_full_text,
+                "full_text_unavailable_reason": full_text_unavailable_reason,
             }
 
         grounded = self._grounded_answer(query=query, evidence_packets=evidence_packets)
@@ -364,14 +485,21 @@ class AgenticPageIndexQA:
         citations = grounded.get("citations", [])
         if not isinstance(citations, list):
             citations = []
+        citations = self._validate_citations(citations, evidence_packets)
 
         answer = grounded.get("answer", "").strip()
         evidence_sufficient = grounded.get("evidence_sufficient", "no")
         insufficient_reason = grounded.get("insufficient_reason", "")
 
         if not answer:
-            answer = "Insufficient evidence: the model did not return a usable grounded answer."
+            if full_text_unavailable_reason:
+                answer = f"Insufficient evidence: {full_text_unavailable_reason}"
+            else:
+                answer = "Insufficient evidence: the model did not return a usable grounded answer."
             evidence_sufficient = "no"
+
+        if evidence_sufficient != "yes" and not insufficient_reason and full_text_unavailable_reason:
+            insufficient_reason = full_text_unavailable_reason
 
         return {
             "answer": answer,
@@ -382,4 +510,5 @@ class AgenticPageIndexQA:
             "summary_enough": "yes" if summary_enough else "no",
             "used_full_text": used_full_text,
             "summary_sufficiency_reason": sufficiency.get("reason", ""),
+            "full_text_unavailable_reason": full_text_unavailable_reason,
         }

@@ -35,24 +35,20 @@ QWEN_BASE_URL = os.getenv("QWEN_BASE_URL", "")
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT = """You are an expert document retrieval assistant.
 
-Your task is to identify which nodes in a document tree structure are most likely to contain information relevant to the user's query.
+Your task is to identify which nodes in a document tree are most likely to contain answer-bearing information for the user's query.
 
-## How to approach this:
-1. Read the user's query carefully to understand what information is being sought.
-2. Examine each node's title and summary in the provided tree structure.
-3. Reason step-by-step about which nodes are semantically relevant to the query.
-4. Consider both direct matches (node explicitly covers the query topic) and indirect matches (node contains context that helps answer the query).
-5. If the query is about a specific sub-topic, prefer the most specific (deepest) node in the tree that covers it.
-
-## Output format (strict JSON — no markdown, no code blocks):
+Output format (strict JSON only; no markdown, no code blocks, no extra text):
 {
-  "thinking": "<your step-by-step reasoning about which nodes are relevant and why>",
-  "node_list": ["node_id_1", "node_id_2", ...]
+    "rationale": "short explanation",
+    "node_list": ["node_id_1", "node_id_2"]
 }
 
 Rules:
 - Return ONLY valid JSON. No extra text before or after.
-- Include ALL node IDs that are relevant, including parent nodes if the parent's own summary (not just children) is relevant.
+- Prefer the most specific nodes that are sufficient to answer the query.
+- Include a parent node only if the parent summary itself contains answer-bearing information.
+- Avoid returning both a parent and all of its children unless both are independently useful.
+- Return at most 4 node IDs per pass.
 - If no node is relevant, return an empty node_list: [].
 - Use the exact node_id strings from the tree (e.g., "0001", "0005").
 """
@@ -120,6 +116,17 @@ def collect_all_node_ids(nodes: list[dict]) -> set[str]:
     return ids
 
 
+def collect_child_node_ids(nodes: list[dict]) -> set[str]:
+    """Collect only descendant node IDs from a subtree root list."""
+    ids = set()
+    for node in nodes:
+        nid = node.get("node_id")
+        if nid:
+            ids.add(nid)
+        ids |= collect_child_node_ids(node.get("nodes", []))
+    return ids
+
+
 # ---------------------------------------------------------------------------
 # LLM call helper
 # ---------------------------------------------------------------------------
@@ -146,7 +153,7 @@ def call_llm(client: OpenAI, model: str, user_prompt: str) -> dict:
     except json.JSONDecodeError as e:
         print(f"\n[WARN] Failed to parse LLM response as JSON: {e}")
         print(f"Raw response:\n{raw}\n")
-        return {"thinking": raw, "node_list": []}
+        return {"rationale": raw, "node_list": []}
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +177,9 @@ def traverse(
     """
     doc_name = tree_data.get("doc_name", "unknown")
     top_nodes: list[dict] = tree_data.get("structure", [])
-    all_ids = collect_all_node_ids(top_nodes)
+    top_level_ids = {n.get("node_id") for n in top_nodes if n.get("node_id")}
+    max_nodes_per_pass = 4
+    max_top_level_candidates = 3
 
     # ---- Pass 1: top-level scan ----
     if log_progress:
@@ -185,15 +194,41 @@ def traverse(
         f"Query: {query}\n\n"
         f"Document tree structure (top-level sections only):\n"
         f"{tree_text_toplevel}\n\n"
-        f"Identify which top-level sections are relevant to the query."
+        f"Identify which top-level sections are relevant to the query. "
+        f"Return up to {max_top_level_candidates} candidate top-level node IDs."
     )
 
     result1 = call_llm(client, model, prompt_pass1)
-    thinking1 = result1.get("thinking", "")
-    selected_top = result1.get("node_list", [])
+    thinking1 = result1.get("rationale") or result1.get("thinking", "")
+    selected_top_raw = result1.get("node_list", [])
+    if not isinstance(selected_top_raw, list):
+        selected_top_raw = []
 
-    # Validate IDs
-    selected_top = [nid for nid in selected_top if nid in all_ids]
+    # Validate IDs and keep only top-level candidates
+    selected_top = [
+        nid for nid in selected_top_raw if isinstance(nid, str) and nid in top_level_ids
+    ][:max_top_level_candidates]
+
+    # Lightweight robustness fallback: retry pass 1 with broader instructions.
+    if not selected_top:
+        prompt_pass1_retry = (
+            f"Query: {query}\n\n"
+            f"Document tree structure (top-level sections only):\n"
+            f"{tree_text_toplevel}\n\n"
+            f"No exact match found in a prior attempt. Return up to {max_top_level_candidates} "
+            f"best top-level candidate node IDs that are most likely to contain relevant details, "
+            f"even if confidence is moderate."
+        )
+        result1_retry = call_llm(client, model, prompt_pass1_retry)
+        retry_rationale = result1_retry.get("rationale") or result1_retry.get("thinking", "")
+        selected_top_retry_raw = result1_retry.get("node_list", [])
+        if not isinstance(selected_top_retry_raw, list):
+            selected_top_retry_raw = []
+        selected_top = [
+            nid for nid in selected_top_retry_raw if isinstance(nid, str) and nid in top_level_ids
+        ][:max_top_level_candidates]
+        if verbose and retry_rationale:
+            print(f"Pass 1 fallback rationale:\n{retry_rationale}\n")
 
     if verbose:
         print(f"Thinking (Pass 1):\n{thinking1}\n")
@@ -225,9 +260,15 @@ def traverse(
                 f"(not just its children) is directly relevant."
             )
             result2 = call_llm(client, model, prompt_pass2)
-            thinking2 = result2.get("thinking", "")
-            selected_children = result2.get("node_list", [])
-            selected_children = [c for c in selected_children if c in all_ids]
+            thinking2 = result2.get("rationale") or result2.get("thinking", "")
+            selected_children_raw = result2.get("node_list", [])
+            if not isinstance(selected_children_raw, list):
+                selected_children_raw = []
+
+            allowed_ids = collect_child_node_ids(children) | {nid}
+            selected_children = [
+                c for c in selected_children_raw if isinstance(c, str) and c in allowed_ids
+            ][:max_nodes_per_pass]
 
             if verbose:
                 print(f"Thinking (Pass 2 for {nid}):\n{thinking2}\n")
@@ -294,9 +335,9 @@ def main():
     )
     parser.add_argument(
         "--verbose",
-        action="store_true",
-        default=True,
-        help="Print LLM reasoning for each pass (default: True)",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Print LLM rationale for each pass (default: False). Use --no-verbose to disable.",
     )
     args = parser.parse_args()
 

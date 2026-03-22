@@ -7,6 +7,7 @@ Run with:
 
 import json
 import os
+from pathlib import Path
 
 import httpx
 import streamlit as st
@@ -296,6 +297,55 @@ def render_tree_sidebar(nodes: list[dict], depth: int = 0):
             render_tree_sidebar(children, depth + 1)
 
 
+def save_uploaded_source_file(uploaded_file) -> str:
+    """Persist uploaded source files so they can be read during QA calls."""
+    out_dir = Path("data") / "uploaded_sources"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / uploaded_file.name
+    with open(out_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return str(out_path.resolve())
+
+
+def resolve_source_path(
+    tree_data: dict,
+    selected_doc: dict | None = None,
+    manual_override: str | None = None,
+) -> str | None:
+    """Best-effort source path resolution for optional full-text retrieval."""
+    candidates: list[str] = []
+
+    if isinstance(manual_override, str) and manual_override.strip():
+        candidates.append(manual_override)
+
+    direct = tree_data.get("source_path") if isinstance(tree_data, dict) else None
+    if isinstance(direct, str) and direct.strip():
+        candidates.append(direct)
+
+    if selected_doc and isinstance(selected_doc, dict):
+        doc_path = selected_doc.get("path")
+        if isinstance(doc_path, str) and doc_path.strip():
+            candidates.append(doc_path)
+
+    doc_name = tree_data.get("doc_name") if isinstance(tree_data, dict) else None
+    if isinstance(doc_name, str) and doc_name.strip():
+        if doc_name.lower().endswith((".pdf", ".md", ".markdown")):
+            candidates.extend(
+                [
+                    doc_name,
+                    str(Path("data") / doc_name),
+                    str(Path("results") / doc_name),
+                ]
+            )
+
+    for candidate in candidates:
+        p = Path(candidate).expanduser()
+        if p.is_file():
+            return str(p.resolve())
+
+    return None
+
+
 # ── Session state init ────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []  # list of {role, content, nodes, thinking}
@@ -305,6 +355,10 @@ if "doc_name" not in st.session_state:
     st.session_state.doc_name = None
 if "loaded_docs" not in st.session_state:
     st.session_state.loaded_docs = []
+if "manual_source_path" not in st.session_state:
+    st.session_state.manual_source_path = ""
+if "doc_source_overrides" not in st.session_state:
+    st.session_state.doc_source_overrides = {}
 
 
 # ══ SIDEBAR ══════════════════════════════════════════════════════════════════
@@ -360,11 +414,13 @@ with st.sidebar:
                     st.session_state.tree_data = raw
                     st.session_state.doc_name = raw.get("doc_name", uploaded_files[0].name)
                     st.session_state.loaded_docs = []
+                    st.session_state.doc_source_overrides = {}
                     st.success(f"✅ Loaded: **{st.session_state.doc_name}**")
                 else:
                     st.session_state.tree_data = None
                     st.session_state.doc_name = None
                     st.session_state.loaded_docs = docs
+                    st.session_state.manual_source_path = ""
                     st.success(f"✅ Loaded {len(docs)} uploaded document(s)")
 
                 # Clear chat when a new doc is loaded
@@ -385,6 +441,35 @@ with st.sidebar:
 
             with st.expander("View tree structure", expanded=False):
                 render_tree_sidebar(top_nodes)
+
+            st.markdown("### 📎 Source PDF (Optional)")
+            source_pdf = st.file_uploader(
+                "Attach source PDF for this JSON",
+                type=["pdf"],
+                key="single_json_source_pdf",
+                help="Used for full-text fallback when JSON only has summaries.",
+            )
+            if source_pdf is not None:
+                try:
+                    saved_path = save_uploaded_source_file(source_pdf)
+                    st.session_state.manual_source_path = saved_path
+                    st.success(f"Attached source PDF: {Path(saved_path).name}")
+                except Exception as e:
+                    st.error(f"Failed to save source PDF: {e}")
+
+            manual_path_input = st.text_input(
+                "Or set local source PDF path",
+                value=st.session_state.manual_source_path,
+                help="Absolute or relative file path to the source PDF.",
+            ).strip()
+            if manual_path_input:
+                candidate = Path(manual_path_input).expanduser()
+                if candidate.is_file():
+                    st.session_state.manual_source_path = str(candidate.resolve())
+                else:
+                    st.warning("Source PDF path does not exist yet.")
+            if st.session_state.manual_source_path:
+                st.caption(f"Using source: {st.session_state.manual_source_path}")
         elif st.session_state.loaded_docs:
             st.markdown("---")
             st.markdown("### 📚 Uploaded Documents")
@@ -394,6 +479,22 @@ with st.sidebar:
                     f"  - source: {doc.get('path')}\n"
                     f"  - description: {doc.get('doc_description', '(no description)')}"
                 )
+            st.markdown("### 📎 Source PDF Mapping (Optional)")
+            doc_options = [d.get("doc_id") for d in st.session_state.loaded_docs if d.get("doc_id")]
+            if doc_options:
+                map_doc_id = st.selectbox("Document ID to map", options=doc_options, key="map_doc_id_single_mode")
+                map_pdf = st.file_uploader(
+                    "Attach source PDF for selected document",
+                    type=["pdf"],
+                    key="map_doc_pdf_single_mode",
+                )
+                if map_pdf is not None:
+                    try:
+                        saved_path = save_uploaded_source_file(map_pdf)
+                        st.session_state.doc_source_overrides[map_doc_id] = saved_path
+                        st.success(f"Mapped [{map_doc_id}] -> {Path(saved_path).name}")
+                    except Exception as e:
+                        st.error(f"Failed to save mapped PDF: {e}")
     else:
         json_dir = st.text_input(
             "JSON folder path",
@@ -407,6 +508,7 @@ with st.sidebar:
                 st.session_state.tree_data = None
                 st.session_state.doc_name = None
                 st.session_state.messages = []
+                st.session_state.doc_source_overrides = {}
                 st.success(f"✅ Loaded {len(docs)} document(s) from {json_dir}")
             except Exception as e:
                 st.error(f"Failed to load folder: {e}")
@@ -420,6 +522,23 @@ with st.sidebar:
                     f"  - path: {doc.get('path')}\\n"
                     f"  - description: {doc.get('doc_description', '(no description)')}"
                 )
+
+            st.markdown("### 📎 Source PDF Mapping (Optional)")
+            folder_doc_options = [d.get("doc_id") for d in st.session_state.loaded_docs if d.get("doc_id")]
+            if folder_doc_options:
+                folder_map_doc_id = st.selectbox("Document ID to map", options=folder_doc_options, key="map_doc_id_folder_mode")
+                folder_map_pdf = st.file_uploader(
+                    "Attach source PDF for selected document",
+                    type=["pdf"],
+                    key="map_doc_pdf_folder_mode",
+                )
+                if folder_map_pdf is not None:
+                    try:
+                        saved_path = save_uploaded_source_file(folder_map_pdf)
+                        st.session_state.doc_source_overrides[folder_map_doc_id] = saved_path
+                        st.success(f"Mapped [{folder_map_doc_id}] -> {Path(saved_path).name}")
+                    except Exception as e:
+                        st.error(f"Failed to save mapped PDF: {e}")
 
     st.markdown("---")
     if st.button("🗑️ Clear chat", use_container_width=True):
@@ -580,6 +699,8 @@ if query:
     # Run traversal + generation
     with st.chat_message("assistant", avatar="🤖"):
         client = get_client(model_name)
+        selected_doc_for_source = None
+        manual_source_override = ""
 
         use_multi_doc_routing = source_mode == "JSON Folder" or (source_mode == "Single JSON" and bool(st.session_state.loaded_docs))
 
@@ -588,7 +709,7 @@ if query:
             selection = select_document_for_query(query, docs)
             selected_doc = selection.get("selected_doc")
 
-            if not selected_doc:
+            if not isinstance(selected_doc, dict):
                 answer = "Insufficient evidence: no document could be selected for this query."
                 thinking_all = "Document selection failed."
                 retrieved_nodes = []
@@ -651,6 +772,10 @@ if query:
                 st.stop()
 
             target_tree_data = selected_doc.get("tree_data", {})
+            selected_doc_for_source = selected_doc
+            selected_doc_id = selected_doc.get("doc_id")
+            if isinstance(selected_doc_id, str):
+                manual_source_override = st.session_state.doc_source_overrides.get(selected_doc_id, "")
             selected_doc_info = {
                 "doc_id": selected_doc.get("doc_id"),
                 "doc_title": selected_doc.get("doc_title"),
@@ -658,6 +783,7 @@ if query:
             }
         else:
             target_tree_data = st.session_state.tree_data or {}
+            manual_source_override = st.session_state.manual_source_path or ""
             selected_doc_info = {
                 "doc_id": target_tree_data.get("doc_id") or st.session_state.doc_name,
                 "doc_title": target_tree_data.get("doc_title") or target_tree_data.get("doc_name") or st.session_state.doc_name,
@@ -676,10 +802,16 @@ if query:
             }
 
         with st.status("🤖 Running agentic QA (tree -> full text on demand)...", expanded=False) as status:
+            resolved_source_path = resolve_source_path(
+                target_tree_data,
+                selected_doc_for_source,
+                manual_override=manual_source_override,
+            )
             agent = AgenticPageIndexQA(
                 tree_data=target_tree_data,
                 client=client,
                 model=model_name,
+                source_path=resolved_source_path,
             )
 
             status.write("Step 1: Tree traversal on summaries")
@@ -698,6 +830,8 @@ if query:
                 f"Summary enough: {result.get('summary_enough', 'no')}\n"
                 f"Used full text: {result.get('used_full_text', False)}\n"
                 f"Sufficiency reason: {result.get('summary_sufficiency_reason', '')}\n"
+                f"Source path used: {resolved_source_path or 'none'}\n"
+                f"Full-text availability: {result.get('full_text_unavailable_reason', '') or 'ok'}\n"
                 f"Evidence sufficient: {result.get('evidence_sufficient', 'no')}\n"
                 f"Insufficient reason: {result.get('insufficient_reason', '')}"
             )
