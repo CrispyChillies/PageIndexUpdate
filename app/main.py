@@ -17,8 +17,15 @@ from app.database import Base, engine, get_db, initialize_database, sync_documen
 from app.document_selector import find_relevant_documents
 from app.indexing import build_index_options, index_document, persist_upload
 from app.models import DocumentRecord
-from app.retrieval import expand_node, retrieve_full_content, search_documents
+from app.retrieval import (
+    answer_with_pageindex,
+    expand_node,
+    retrieve_full_content,
+    search_documents,
+)
 from app.schemas import (
+    AnswerWithPageIndexRequest,
+    AnswerWithPageIndexResponse,
     DocumentCreate,
     DocumentCreateResponse,
     DocumentResponse,
@@ -273,6 +280,37 @@ def retrieve_node_content(
         status_code = 422 if "Invalid page range" in detail else 404
         raise HTTPException(status_code=status_code, detail=detail) from exc
     return RetrieveFullContentResponse(**result)
+
+
+@app.post(
+    "/answer_with_pageindex",
+    response_model=AnswerWithPageIndexResponse,
+    tags=["full-content"],
+    summary="Run the full retrieval workflow and return final answer context",
+    description=(
+        "End-to-end retrieval endpoint for OpenWebUI integration. It selects the most relevant "
+        "document, searches and ranks node summaries, asks an internal LLM whether summaries are "
+        "sufficient, optionally retrieves full PDF text for the best nodes, and returns a final "
+        "context block plus structured sources."
+    ),
+    operation_id="answer_with_pageindex",
+)
+def answer_with_pageindex_route(
+    payload: AnswerWithPageIndexRequest, db: Session = Depends(get_db)
+):
+    try:
+        result = answer_with_pageindex(
+            db=db,
+            query=payload.query,
+            document_top_k=payload.document_top_k,
+            node_top_k=payload.node_top_k,
+            selected_node_limit=payload.selected_node_limit,
+            status=payload.status,
+            model=settings.retrieval_model,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AnswerWithPageIndexResponse(**result)
 
 
 @app.get(

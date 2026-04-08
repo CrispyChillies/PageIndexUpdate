@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import DocumentRecord
 from pageindex.utils import get_text_of_pages
+from app.document_selector import find_relevant_documents
 
 SYSTEM_PROMPT = """You are an expert document retrieval assistant.
 
@@ -55,6 +57,28 @@ STOPWORDS = {
     "with",
 }
 
+ANSWER_SUFFICIENCY_PROMPT = """You are an expert retrieval judge.
+
+Decide whether the candidate node summaries are sufficient to answer the user's query without fetching full page content.
+
+Output format (strict JSON only; no markdown, no code blocks, no extra text):
+{
+    "enough": true,
+    "rationale": "short explanation",
+    "useful_node_ids": ["node_id_1", "node_id_2"]
+}
+
+Rules:
+- Return ONLY valid JSON.
+- Set "enough" to true if the summaries already contain enough information to build a grounded answer context.
+- Set "enough" to false if exact detail, evidence, or fuller explanation is still needed.
+- Select at most 2 useful_node_ids.
+- Use the exact node_id strings from the candidates.
+- If none are useful, return an empty useful_node_ids list.
+"""
+
+logger = logging.getLogger(__name__)
+
 
 def get_retrieval_client() -> OpenAI:
     api_key = os.getenv("CHATGPT_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -97,7 +121,9 @@ def build_toplevel_text(nodes: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def find_node_by_id(nodes: list[dict[str, Any]], target_id: str) -> dict[str, Any] | None:
+def find_node_by_id(
+    nodes: list[dict[str, Any]], target_id: str
+) -> dict[str, Any] | None:
     for node in nodes:
         if node.get("node_id") == target_id:
             return node
@@ -155,7 +181,9 @@ def compute_score(query: str, node: dict[str, Any], rank: int) -> float:
     overlap = len(query_terms & node_terms)
     coverage = overlap / len(query_terms)
     rank_bonus = max(0.0, 0.15 - rank * 0.02)
-    title_bonus = 0.1 if normalize_terms(str(node.get("title", ""))) & query_terms else 0.0
+    title_bonus = (
+        0.1 if normalize_terms(str(node.get("title", ""))) & query_terms else 0.0
+    )
     return round(min(0.99, coverage + rank_bonus + title_bonus), 2)
 
 
@@ -233,7 +261,9 @@ def traverse_tree(
     return results
 
 
-def build_hit(document: DocumentRecord, node: dict[str, Any], query: str, rank: int) -> dict[str, Any]:
+def build_hit(
+    document: DocumentRecord, node: dict[str, Any], query: str, rank: int
+) -> dict[str, Any]:
     return {
         "document_id": document.id,
         "node_id": node.get("node_id"),
@@ -245,14 +275,21 @@ def build_hit(document: DocumentRecord, node: dict[str, Any], query: str, rank: 
     }
 
 
+def debug_log(message: str) -> None:
+    print(f"[answer_with_pageindex] {message}", flush=True)
+    logger.info(message)
+
+
 def search_documents(
     db: Session,
     query: str,
     document_ids: list[str],
     top_k: int,
     model: str,
+    client: OpenAI | None = None,
 ) -> list[dict[str, Any]]:
-    client = get_retrieval_client()
+    if client is None:
+        client = get_retrieval_client()
     hits: list[dict[str, Any]] = []
     for document_id in document_ids:
         record = db.get(DocumentRecord, document_id)
@@ -265,6 +302,281 @@ def search_documents(
 
     hits.sort(key=lambda item: item["score"], reverse=True)
     return hits[:top_k]
+
+
+def call_judge_llm(client: OpenAI, model: str, user_prompt: str) -> dict[str, Any]:
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": ANSWER_SUFFICIENCY_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"enough": False, "rationale": raw, "useful_node_ids": []}
+
+
+def judge_summary_sufficiency(
+    client: OpenAI,
+    model: str,
+    query: str,
+    hits: list[dict[str, Any]],
+    selected_node_limit: int,
+) -> dict[str, Any]:
+    candidate_lines: list[str] = []
+    allowed_ids: set[str] = set()
+    for hit in hits:
+        node_id = hit.get("node_id")
+        if not node_id:
+            continue
+        allowed_ids.add(node_id)
+        candidate_lines.append(
+            "\n".join(
+                [
+                    f"Node ID: {node_id}",
+                    f"Title: {hit.get('title') or '(untitled)'}",
+                    f"Pages: {hit.get('page_start')} - {hit.get('page_end')}",
+                    f"Score: {hit.get('score')}",
+                    f"Summary: {hit.get('summary') or '(no summary)'}",
+                ]
+            )
+        )
+
+    if not candidate_lines:
+        return {
+            "enough": False,
+            "rationale": "No summary candidates found.",
+            "useful_node_ids": [],
+        }
+
+    candidate_text = "\n\n".join(candidate_lines)
+    prompt = (
+        f"Query: {query}\n\n"
+        "Candidate node summaries:\n"
+        f"{candidate_text}\n\n"
+        "Are these summaries enough to answer the query without retrieving full content? "
+        f"If not, choose up to {selected_node_limit} node IDs that should be expanded."
+    )
+    result = call_judge_llm(client, model, prompt)
+    useful_node_ids = result.get("useful_node_ids", [])
+    if not isinstance(useful_node_ids, list):
+        useful_node_ids = []
+    useful_node_ids = [
+        node_id
+        for node_id in useful_node_ids
+        if isinstance(node_id, str) and node_id in allowed_ids
+    ][:selected_node_limit]
+    enough = bool(result.get("enough"))
+    rationale = str(result.get("rationale", "")).strip()
+    return {
+        "enough": enough,
+        "rationale": rationale,
+        "useful_node_ids": useful_node_ids,
+    }
+
+
+def build_summary_context(document: DocumentRecord, hits: list[dict[str, Any]]) -> str:
+    parts = [f"Document: {document.doc_name or document.title or document.id}"]
+    if document.doc_description:
+        parts.append(f"Description: {document.doc_description}")
+    for hit in hits:
+        parts.append(
+            "\n".join(
+                [
+                    f"Section: {hit.get('title') or '(untitled)'}",
+                    f"Node ID: {hit.get('node_id')}",
+                    f"Pages: {hit.get('page_start')} - {hit.get('page_end')}",
+                    f"Summary: {hit.get('summary') or '(no summary)'}",
+                ]
+            )
+        )
+    return "\n\n".join(parts)
+
+
+def build_full_content_context(
+    document: DocumentRecord, items: list[dict[str, Any]]
+) -> str:
+    parts = [f"Document: {document.doc_name or document.title or document.id}"]
+    if document.doc_description:
+        parts.append(f"Description: {document.doc_description}")
+    for item in items:
+        parts.append(
+            "\n".join(
+                [
+                    f"Section: {item.get('title') or '(untitled)'}",
+                    f"Node ID: {item.get('node_id')}",
+                    f"Pages: {item.get('page_start')} - {item.get('page_end')}",
+                    "Content:",
+                    item.get("content") or "",
+                ]
+            )
+        )
+    return "\n\n".join(parts)
+
+
+def answer_with_pageindex(
+    db: Session,
+    query: str,
+    document_top_k: int,
+    node_top_k: int,
+    selected_node_limit: int,
+    status: str,
+    model: str,
+) -> dict[str, Any]:
+    effective_document_top_k = 1
+    debug_log(f"query={query!r}")
+    if document_top_k != 1:
+        debug_log(
+            f"document_top_k={document_top_k} requested, but this workflow is currently fixed to 1 document for speed"
+        )
+    debug_log(f"step 1: finding top {effective_document_top_k} document")
+    document_result = find_relevant_documents(
+        db=db,
+        query=query,
+        top_k=effective_document_top_k,
+        status=status,
+    )
+    docs = document_result.get("docs", [])
+    if not docs:
+        debug_log("no relevant documents found")
+        return {"context": "", "sources": []}
+
+    top_doc = docs[0]
+    document_id = top_doc["id"]
+    record = db.get(DocumentRecord, document_id)
+    if record is None or record.status != "completed" or not record.raw_tree:
+        debug_log(f"top document unavailable or not indexed: {document_id}")
+        return {"context": "", "sources": []}
+
+    client = get_retrieval_client()
+    debug_log(
+        f"step 2: searching top {node_top_k} node summaries inside document {document_id}"
+    )
+    hits = search_documents(
+        db=db,
+        query=query,
+        document_ids=[document_id],
+        top_k=node_top_k,
+        model=model,
+        client=client,
+    )
+    if not hits:
+        debug_log("no node summaries found")
+        return {"context": "", "sources": []}
+
+    debug_log(f"step 3: ranking produced {len(hits)} candidate summaries")
+    debug_log("step 4: asking LLM whether summaries are sufficient")
+    sufficiency = judge_summary_sufficiency(
+        client=client,
+        model=model,
+        query=query,
+        hits=hits,
+        selected_node_limit=selected_node_limit,
+    )
+    debug_log(
+        "judge result: enough=%s useful_node_ids=%s rationale=%s"
+        % (
+            sufficiency["enough"],
+            sufficiency["useful_node_ids"],
+            sufficiency["rationale"] or "(empty)",
+        )
+    )
+
+    if sufficiency["enough"]:
+        selected_hits = hits[:selected_node_limit]
+        debug_log("step 5: summaries are sufficient, returning summary context")
+        result = {
+            "context": build_summary_context(record, selected_hits),
+            "sources": [
+                {
+                    "document_id": hit["document_id"],
+                    "node_id": hit.get("node_id"),
+                    "title": hit.get("title"),
+                    "page_start": hit.get("page_start"),
+                    "page_end": hit.get("page_end"),
+                    "score": hit.get("score"),
+                    "content_type": "summary",
+                    "content": hit.get("summary") or "",
+                }
+                for hit in selected_hits
+            ],
+        }
+        debug_log("step 8: returning response")
+        return result
+
+    debug_log("step 6: summaries are not sufficient, retrieving full content")
+    hit_by_node_id = {hit["node_id"]: hit for hit in hits if hit.get("node_id")}
+    selected_node_ids = sufficiency["useful_node_ids"] or [
+        hit["node_id"] for hit in hits[:selected_node_limit] if hit.get("node_id")
+    ]
+
+    full_content_items: list[dict[str, Any]] = []
+    for node_id in selected_node_ids:
+        hit = hit_by_node_id.get(node_id)
+        if not hit:
+            continue
+        try:
+            item = retrieve_full_content(
+                db=db,
+                document_id=hit["document_id"],
+                node_id=node_id,
+                start_page=hit["page_start"],
+                end_page=hit["page_end"],
+            )
+            item["score"] = hit.get("score")
+            full_content_items.append(item)
+            debug_log(
+                f"retrieved full content for node {node_id} pages {hit['page_start']}-{hit['page_end']}"
+            )
+        except ValueError as exc:
+            debug_log(f"full content retrieval failed for node {node_id}: {exc}")
+
+    if not full_content_items:
+        debug_log("full content unavailable, falling back to summary context")
+        fallback_hits = hits[:selected_node_limit]
+        result = {
+            "context": build_summary_context(record, fallback_hits),
+            "sources": [
+                {
+                    "document_id": hit["document_id"],
+                    "node_id": hit.get("node_id"),
+                    "title": hit.get("title"),
+                    "page_start": hit.get("page_start"),
+                    "page_end": hit.get("page_end"),
+                    "score": hit.get("score"),
+                    "content_type": "summary",
+                    "content": hit.get("summary") or "",
+                }
+                for hit in fallback_hits
+            ],
+        }
+        debug_log("step 8: returning fallback response")
+        return result
+
+    debug_log("step 7: building final context from full content")
+    result = {
+        "context": build_full_content_context(record, full_content_items),
+        "sources": [
+            {
+                "document_id": item["document_id"],
+                "node_id": item.get("node_id"),
+                "title": item.get("title"),
+                "page_start": item.get("page_start"),
+                "page_end": item.get("page_end"),
+                "score": item.get("score"),
+                "content_type": "full_content",
+                "content": None,
+            }
+            for item in full_content_items
+        ],
+    }
+    debug_log("step 8: returning response")
+    return result
 
 
 def expand_node(db: Session, document_id: str, node_id: str) -> dict[str, Any]:

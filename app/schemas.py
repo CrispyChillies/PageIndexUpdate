@@ -204,3 +204,54 @@ class FindRelevantDocumentsResponse(BaseModel):
     next_steps: NextSteps
     search_mode: str
     total_returned: int
+
+
+class AnswerWithPageIndexRequest(BaseModel):
+    query: str = Field(
+        description="User question for the end-to-end retrieval workflow.",
+        examples=["What are the major risk factors discussed in this document?"],
+    )
+    document_top_k: int = Field(
+        default=1,
+        description="Number of documents to consider. Keep this at 1 for now for faster execution.",
+    )
+    node_top_k: int = Field(
+        default=5,
+        description="Maximum number of node summaries to retrieve from the selected document.",
+    )
+    selected_node_limit: int = Field(
+        default=2,
+        description="Maximum number of nodes to expand to full content when summaries are insufficient.",
+    )
+    status: str = Field(
+        default="completed",
+        description="Only search documents in this indexing status.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "query": "What are the major risk factors discussed in this document?",
+                "document_top_k": 1,
+                "node_top_k": 5,
+                "selected_node_limit": 2,
+                "status": "completed",
+            }
+        }
+    }
+
+
+class AnswerWithPageIndexSource(BaseModel):
+    document_id: str
+    node_id: str | None = None
+    title: str | None = None
+    page_start: int | None = None
+    page_end: int | None = None
+    score: float | None = None
+    content_type: str
+    content: str | None = None
+
+
+class AnswerWithPageIndexResponse(BaseModel):
+    context: str
+    sources: list[AnswerWithPageIndexSource]
