@@ -4,8 +4,10 @@ from datetime import datetime
 from sqlalchemy import DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from pgvector.sqlalchemy import Vector
 
 from app.database import Base
+from app.config import settings
 
 
 class DocumentRecord(Base):
@@ -21,6 +23,13 @@ class DocumentRecord(Base):
     pageindex_doc_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     doc_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     doc_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_count: Mapped[int | None] = mapped_column(nullable=True)
+    folder_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    embedding_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.embedding_dimensions), nullable=True
+    )
     raw_tree: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     index_options: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

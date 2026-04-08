@@ -5,7 +5,8 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Requ
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import Base, engine, get_db
+from app.database import Base, engine, get_db, initialize_database, sync_document_schema
+from app.document_selector import find_relevant_documents
 from app.indexing import build_index_options, index_document, persist_upload
 from app.models import DocumentRecord
 from app.retrieval import expand_node, retrieve_full_content, search_documents
@@ -15,6 +16,8 @@ from app.schemas import (
     DocumentResponse,
     ExpandNodeRequest,
     ExpandNodeResponse,
+    FindRelevantDocumentsRequest,
+    FindRelevantDocumentsResponse,
     RetrieveFullContentRequest,
     RetrieveFullContentResponse,
     SearchRequest,
@@ -24,7 +27,9 @@ from app.schemas import (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    initialize_database()
     Base.metadata.create_all(bind=engine)
+    sync_document_schema()
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     yield
 
@@ -107,6 +112,20 @@ def get_document(document_id: str, db: Session = Depends(get_db)):
         updated_at=record.updated_at,
         completed_at=record.completed_at,
     )
+
+
+@app.post("/find_relevant_documents", response_model=FindRelevantDocumentsResponse)
+def find_documents(payload: FindRelevantDocumentsRequest, db: Session = Depends(get_db)):
+    try:
+        result = find_relevant_documents(
+            db=db,
+            query=payload.query,
+            top_k=payload.top_k,
+            status=payload.status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return FindRelevantDocumentsResponse(**result)
 
 
 @app.post("/search", response_model=SearchResponse)

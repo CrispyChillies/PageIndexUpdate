@@ -9,6 +9,7 @@ from fastapi import UploadFile
 
 from app.config import settings
 from app.database import SessionLocal
+from app.document_selector import ensure_document_embedding, infer_page_count
 from app.models import DocumentRecord
 from pageindex import page_index_main
 from pageindex.page_index_md import md_to_tree
@@ -111,10 +112,12 @@ def index_document(document_id: str) -> None:
             record.pageindex_doc_id = result.get("doc_id") or result.get("doc_name")
             record.doc_name = result.get("doc_name")
             record.doc_description = result.get("doc_description")
+            record.page_count = infer_page_count(result)
             record.raw_tree = result
             record.completed_at = datetime.now(timezone.utc)
             record.error_message = None
             db.commit()
+            ensure_document_embedding(db, record)
         except Exception as exc:
             record.status = "failed"
             record.error_message = str(exc)

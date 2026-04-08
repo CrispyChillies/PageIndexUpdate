@@ -106,3 +106,35 @@ class RetrieveFullContentResponse(BaseModel):
     page_start: int
     page_end: int
     content: str
+
+
+class FindRelevantDocumentsRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    status: str = "completed"
+
+
+class RelevantDocument(BaseModel):
+    id: str
+    name: str | None = None
+    status: str
+    pageNum: int | None = None
+    folderId: str | None = None
+    createdAt: str | None = None
+    description: str | None = None
+    score: float | None = None
+
+
+class NextSteps(BaseModel):
+    options: list[str]
+    auto_retry: str
+    summary: str
+
+
+class FindRelevantDocumentsResponse(BaseModel):
+    docs: list[RelevantDocument]
+    success: bool
+    has_more: bool
+    next_steps: NextSteps
+    search_mode: str
+    total_returned: int

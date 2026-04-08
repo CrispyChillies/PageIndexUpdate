@@ -12,6 +12,9 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://pageindex:pageindex@localhost:5432/pageindex"
     )
     retrieval_model: str = "gpt-5-mini"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+    document_selector_candidates: int = 20
     upload_dir: Path = Path("data/uploads")
     default_model: str = "gpt-4o-2024-11-20"
     toc_check_pages: int = 20
