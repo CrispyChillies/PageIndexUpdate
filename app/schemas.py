@@ -1,22 +1,39 @@
 from datetime import datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class DocumentCreate(BaseModel):
-    file_path: str | None = None
-    title: str | None = None
-    model: str | None = None
-    toc_check_pages: int | None = None
-    max_pages_per_node: int | None = None
-    max_tokens_per_node: int | None = None
-    if_add_node_id: str | None = None
-    if_add_node_summary: str | None = None
-    if_add_doc_description: str | None = "yes"
-    if_add_node_text: str | None = None
-    if_thinning: str | None = None
-    thinning_threshold: int | None = None
-    summary_token_threshold: int | None = None
+    file_path: str | None = Field(
+        default=None,
+        description="Local file path to a PDF or Markdown document to index.",
+        examples=["./docs/sample.pdf"],
+    )
+    title: str | None = Field(
+        default=None,
+        description="Optional document title. If omitted, the API derives it from the file name.",
+        examples=["Annual Report 2025"],
+    )
+    model: str | None = Field(default=None, description="LLM used during indexing.")
+    toc_check_pages: int | None = Field(default=None, description="PDF TOC detection window.")
+    max_pages_per_node: int | None = Field(default=None, description="Maximum page span per node.")
+    max_tokens_per_node: int | None = Field(default=None, description="Maximum token span per node.")
+    if_add_node_id: str | None = Field(default=None, description='Set to "yes" to include node ids.')
+    if_add_node_summary: str | None = Field(default=None, description='Set to "yes" to include node summaries.')
+    if_add_doc_description: str | None = Field(default="yes", description='Set to "yes" to include document description.')
+    if_add_node_text: str | None = Field(default=None, description='Set to "yes" to store raw node text.')
+    if_thinning: str | None = Field(default=None, description='Markdown-only thinning flag.')
+    thinning_threshold: int | None = Field(default=None, description="Markdown thinning token threshold.")
+    summary_token_threshold: int | None = Field(default=None, description="Markdown summary threshold.")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "file_path": "./docs/sample.pdf",
+                "title": "Annual Report 2025",
+            }
+        }
+    }
 
     @model_validator(mode="after")
     def ensure_file_input(self):
@@ -50,9 +67,25 @@ class DocumentResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str
-    document_ids: list[str]
-    top_k: int = 5
+    query: str = Field(
+        description="User question to search within already selected documents.",
+        examples=["What are the company's major risk factors?"],
+    )
+    document_ids: list[str] = Field(
+        description="Candidate document ids returned by find_relevant_documents.",
+        examples=[["7c69bf20-79ff-4dbc-8f8f-8758817c8637"]],
+    )
+    top_k: int = Field(default=5, description="Maximum number of node hits to return.")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "query": "What are the company's major risk factors?",
+                "document_ids": ["7c69bf20-79ff-4dbc-8f8f-8758817c8637"],
+                "top_k": 5,
+            }
+        }
+    }
 
 
 class SearchHit(BaseModel):
@@ -70,8 +103,17 @@ class SearchResponse(BaseModel):
 
 
 class ExpandNodeRequest(BaseModel):
-    document_id: str
-    node_id: str
+    document_id: str = Field(description="Document id containing the node.")
+    node_id: str = Field(description="Node id to expand.")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "document_id": "7c69bf20-79ff-4dbc-8f8f-8758817c8637",
+                "node_id": "0014",
+            }
+        }
+    }
 
 
 class ExpandNodeChild(BaseModel):
@@ -93,10 +135,21 @@ class ExpandNodeResponse(BaseModel):
 
 
 class RetrieveFullContentRequest(BaseModel):
-    document_id: str
-    node_id: str
-    start_page: int
-    end_page: int
+    document_id: str = Field(description="Document id containing the PDF node.")
+    node_id: str = Field(description="Node id whose pages should be extracted.")
+    start_page: int = Field(description="First PDF page to extract, inclusive.")
+    end_page: int = Field(description="Last PDF page to extract, inclusive.")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "document_id": "7c69bf20-79ff-4dbc-8f8f-8758817c8637",
+                "node_id": "0014",
+                "start_page": 22,
+                "end_page": 26,
+            }
+        }
+    }
 
 
 class RetrieveFullContentResponse(BaseModel):
@@ -109,9 +162,22 @@ class RetrieveFullContentResponse(BaseModel):
 
 
 class FindRelevantDocumentsRequest(BaseModel):
-    query: str
-    top_k: int = 5
-    status: str = "completed"
+    query: str = Field(
+        description="User query used to select the most relevant documents before node-level search.",
+        examples=["OPNT003 clinical studies NDA submission"],
+    )
+    top_k: int = Field(default=5, description="Maximum number of documents to return.")
+    status: str = Field(default="completed", description="Only search documents in this indexing status.")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "query": "OPNT003 clinical studies NDA submission",
+                "top_k": 5,
+                "status": "completed",
+            }
+        }
+    }
 
 
 class RelevantDocument(BaseModel):
