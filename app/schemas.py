@@ -90,3 +90,19 @@ class ExpandNodeResponse(BaseModel):
     page_end: int | None = None
     summary: str | None = None
     children: list[ExpandNodeChild]
+
+
+class RetrieveFullContentRequest(BaseModel):
+    document_id: str
+    node_id: str
+    start_page: int
+    end_page: int
+
+
+class RetrieveFullContentResponse(BaseModel):
+    document_id: str
+    node_id: str
+    title: str | None = None
+    page_start: int
+    page_end: int
+    content: str

@@ -8,13 +8,15 @@ from app.config import settings
 from app.database import Base, engine, get_db
 from app.indexing import build_index_options, index_document, persist_upload
 from app.models import DocumentRecord
-from app.retrieval import expand_node, search_documents
+from app.retrieval import expand_node, retrieve_full_content, search_documents
 from app.schemas import (
     DocumentCreate,
     DocumentCreateResponse,
     DocumentResponse,
     ExpandNodeRequest,
     ExpandNodeResponse,
+    RetrieveFullContentRequest,
+    RetrieveFullContentResponse,
     SearchRequest,
     SearchResponse,
 )
@@ -128,3 +130,20 @@ def expand(payload: ExpandNodeRequest, db: Session = Depends(get_db)):
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ExpandNodeResponse(**result)
+
+
+@app.post("/retrieve-full-content", response_model=RetrieveFullContentResponse)
+def retrieve_node_content(payload: RetrieveFullContentRequest, db: Session = Depends(get_db)):
+    try:
+        result = retrieve_full_content(
+            db=db,
+            document_id=payload.document_id,
+            node_id=payload.node_id,
+            start_page=payload.start_page,
+            end_page=payload.end_page,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 422 if "Invalid page range" in detail else 404
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    return RetrieveFullContentResponse(**result)

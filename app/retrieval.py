@@ -7,6 +7,7 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.models import DocumentRecord
+from pageindex.utils import get_text_of_pages
 
 SYSTEM_PROMPT = """You are an expert document retrieval assistant.
 
@@ -293,4 +294,36 @@ def expand_node(db: Session, document_id: str, node_id: str) -> dict[str, Any]:
             }
             for child in children
         ],
+    }
+
+
+def retrieve_full_content(
+    db: Session,
+    document_id: str,
+    node_id: str,
+    start_page: int,
+    end_page: int,
+) -> dict[str, Any]:
+    record = db.get(DocumentRecord, document_id)
+    if record is None or record.status != "completed" or not record.raw_tree:
+        raise ValueError("Document not found or not indexed")
+    if record.source_type != "pdf":
+        raise ValueError("Full-content retrieval is only supported for PDF documents")
+    if not record.source_path or not os.path.exists(record.source_path):
+        raise ValueError("Source PDF file not found")
+    if start_page <= 0 or end_page <= 0 or start_page > end_page:
+        raise ValueError("Invalid page range")
+
+    node = find_node_by_id(record.raw_tree.get("structure", []), node_id)
+    if node is None:
+        raise ValueError("Node not found")
+
+    content = get_text_of_pages(record.source_path, start_page, end_page, tag=False)
+    return {
+        "document_id": document_id,
+        "node_id": node_id,
+        "title": node.get("title"),
+        "page_start": start_page,
+        "page_end": end_page,
+        "content": content,
     }
