@@ -57,7 +57,10 @@ Rules:
 # Helper: build a compact tree representation for the LLM
 # ---------------------------------------------------------------------------
 
-def build_tree_text(nodes: list[dict], depth: int = 0, show_children: bool = True) -> str:
+
+def build_tree_text(
+    nodes: list[dict], depth: int = 0, show_children: bool = True
+) -> str:
     """Recursively render nodes as indented text for the LLM prompt."""
     lines = []
     indent = "  " * depth
@@ -71,7 +74,9 @@ def build_tree_text(nodes: list[dict], depth: int = 0, show_children: bool = Tru
         lines.append(f"{indent}  Summary: {summary}")
         if children and show_children:
             lines.append(f"{indent}  Sub-sections:")
-            lines.extend(build_tree_text(children, depth + 2, show_children=True).splitlines())
+            lines.extend(
+                build_tree_text(children, depth + 2, show_children=True).splitlines()
+            )
 
     return "\n".join(lines)
 
@@ -84,7 +89,9 @@ def build_toplevel_text(nodes: list[dict]) -> str:
         title = node.get("title", "(untitled)")
         summary = node.get("summary", "(no summary)")
         children = node.get("nodes", [])
-        has_children_note = f"  [has {len(children)} sub-section(s)]" if children else ""
+        has_children_note = (
+            f"  [has {len(children)} sub-section(s)]" if children else ""
+        )
         lines.append(f"[{node_id}] {title}{has_children_note}")
         lines.append(f"  Summary: {summary}")
     return "\n".join(lines)
@@ -93,6 +100,7 @@ def build_toplevel_text(nodes: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 # Helper: find a node by node_id anywhere in the tree
 # ---------------------------------------------------------------------------
+
 
 def find_node_by_id(nodes: list[dict], target_id: str) -> dict | None:
     for node in nodes:
@@ -131,6 +139,7 @@ def collect_child_node_ids(nodes: list[dict]) -> set[str]:
 # LLM call helper
 # ---------------------------------------------------------------------------
 
+
 def call_llm(client: OpenAI, model: str, user_prompt: str) -> dict:
     """Call the Qwen LLM and parse the JSON response."""
     response = client.chat.completions.create(
@@ -159,6 +168,7 @@ def call_llm(client: OpenAI, model: str, user_prompt: str) -> dict:
 # ---------------------------------------------------------------------------
 # Core traversal logic
 # ---------------------------------------------------------------------------
+
 
 def traverse(
     tree_data: dict,
@@ -220,12 +230,16 @@ def traverse(
             f"even if confidence is moderate."
         )
         result1_retry = call_llm(client, model, prompt_pass1_retry)
-        retry_rationale = result1_retry.get("rationale") or result1_retry.get("thinking", "")
+        retry_rationale = result1_retry.get("rationale") or result1_retry.get(
+            "thinking", ""
+        )
         selected_top_retry_raw = result1_retry.get("node_list", [])
         if not isinstance(selected_top_retry_raw, list):
             selected_top_retry_raw = []
         selected_top = [
-            nid for nid in selected_top_retry_raw if isinstance(nid, str) and nid in top_level_ids
+            nid
+            for nid in selected_top_retry_raw
+            if isinstance(nid, str) and nid in top_level_ids
         ][:max_top_level_candidates]
         if verbose and retry_rationale:
             print(f"Pass 1 fallback rationale:\n{retry_rationale}\n")
@@ -248,7 +262,9 @@ def traverse(
             final_node_ids.add(nid)
         else:
             if log_progress:
-                print(f"\n[Pass 2] Drilling into node [{nid}] '{node.get('title')}'...\n")
+                print(
+                    f"\n[Pass 2] Drilling into node [{nid}] '{node.get('title')}'...\n"
+                )
             subtree_text = build_tree_text(children, depth=0, show_children=True)
             prompt_pass2 = (
                 f"Query: {query}\n\n"
@@ -267,7 +283,9 @@ def traverse(
 
             allowed_ids = collect_child_node_ids(children) | {nid}
             selected_children = [
-                c for c in selected_children_raw if isinstance(c, str) and c in allowed_ids
+                c
+                for c in selected_children_raw
+                if isinstance(c, str) and c in allowed_ids
             ][:max_nodes_per_pass]
 
             if verbose:
@@ -290,6 +308,7 @@ def traverse(
 # Pretty-print results
 # ---------------------------------------------------------------------------
 
+
 def print_results(retrieved_nodes: list[dict], query: str) -> None:
     print(f"\n{'='*60}")
     print(f"RETRIEVAL RESULTS for: '{query}'")
@@ -310,6 +329,7 @@ def print_results(retrieved_nodes: list[dict], query: str) -> None:
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -352,13 +372,17 @@ def main():
 
     # Build Qwen client
     if not QWEN_API_KEY or not QWEN_BASE_URL:
-        print("Error: QWEN_API_KEY and QWEN_BASE_URL must be set in .env", file=sys.stderr)
+        print(
+            "Error: QWEN_API_KEY and QWEN_BASE_URL must be set in .env", file=sys.stderr
+        )
         sys.exit(1)
 
     # Disable SSL verification for the local/self-signed Qwen endpoint
     # (same approach used by pageindex/utils.py)
     http_client = httpx.Client(verify=False)
-    client = OpenAI(api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL, http_client=http_client)
+    client = OpenAI(
+        api_key=QWEN_API_KEY, base_url=QWEN_BASE_URL, http_client=http_client
+    )
 
     # Run traversal
     retrieved_nodes = traverse(
